@@ -16,8 +16,11 @@
   "packageManager": "pnpm@10.30.3",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@discordjs/opus": "^0.10.0",
+    "@discordjs/voice": "^0.19.0",
     "discord.js": "^14.25.1",
     "node-html-parser": "^7.1.0",
+    "openai": "^6.27.0",
     "youtube-transcript": "^1.2.1"
   },
   "devDependencies": {
