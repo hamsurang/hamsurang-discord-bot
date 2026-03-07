@@ -1,0 +1,4 @@
+ignoredBuiltDependencies:
+  - '@discordjs/opus'
+  - esbuild
+  - ffmpeg-static
