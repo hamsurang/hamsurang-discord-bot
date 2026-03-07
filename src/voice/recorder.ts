@@ -3,10 +3,9 @@ import { OpusEncoder } from '@discordjs/opus';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { transcribePcmFile } from './transcriber';
 
 const SAMPLE_RATE = 48000;
-const CHANNELS = 1;
+const CHANNELS = 2;
 const CHUNK_SIZE_LIMIT = 20 * 1024 * 1024; // ~20MB
 
 export interface RecordingSession {
@@ -84,6 +83,7 @@ export function startListening(session: RecordingSession): void {
 
   receiver.speaking.on('start', (userId: string) => {
     if (session.userStreams.has(userId)) return;
+    session.userStreams.set(userId, null as unknown as NodeJS.Timeout);
 
     const audioStream = receiver.subscribe(userId, {
       end: { behavior: EndBehaviorType.Manual },
@@ -138,6 +138,7 @@ export function startListening(session: RecordingSession): void {
       const chunkPath = rotateChunk(session);
       if (chunkPath) {
         try {
+          const { transcribePcmFile } = await import('./transcriber');
           const text = await transcribePcmFile(chunkPath);
           if (text.trim()) {
             session.transcribedTexts.push(text);

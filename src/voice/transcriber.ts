@@ -5,7 +5,7 @@ import { openaiApiKey } from '../../config.json';
 const openai = new OpenAI({ apiKey: openaiApiKey });
 
 const SAMPLE_RATE = 48000;
-const CHANNELS = 1;
+const CHANNELS = 2;
 const BITS_PER_SAMPLE = 16;
 
 function pcmToWav(pcmPath: string): string {
