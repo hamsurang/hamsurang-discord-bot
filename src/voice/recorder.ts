@@ -93,6 +93,10 @@ export function startListening(session: RecordingSession): void {
       end: { behavior: EndBehaviorType.Manual },
     });
 
+    audioStream.on('error', (err) => {
+      console.error(`[녹음] audioStream 에러 (유저: ${userId}):`, err.message);
+    });
+
     let packetCount = 0;
     audioStream.on('data', (chunk: Buffer) => {
       try {
