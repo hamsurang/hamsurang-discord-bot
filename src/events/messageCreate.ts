@@ -27,7 +27,16 @@ async function fetchAndSummarize(url: string): Promise<string> {
     messages: [
       {
         role: 'user',
-        content: `아래 웹페이지를 한국어 2~3문장으로 요약하고, 대표 키워드 최대 3개를 쉼표로 나열해줘.\n형식:\n요약: ...\n키워드: ...\n\n${cleaned}`,
+        content: `아래 웹페이지 내용을 요약해줘.
+
+규칙:
+- 마크다운 리스트(bullet point) 형식으로 작성
+- 글의 핵심 내용을 소주제별로 나누어 정리 (최대 3개)
+- 각 항목은 "**소주제**: 설명" 형태로, 설명은 1~2문장 이내
+- 소주제는 글의 내용에 맞게 자유롭게 구성
+- 마지막에 키워드 최대 3개를 쉼표로 나열
+
+${cleaned}`,
       },
     ],
   });
@@ -80,7 +89,16 @@ async function fetchAndSummarizeYouTube(videoId: string, url: string): Promise<s
     messages: [
       {
         role: 'user',
-        content: `아래 YouTube 자막을 한국어 2~3문장으로 요약하고, 대표 키워드 최대 3개를 쉼표로 나열해줘.\n형식:\n요약: ...\n키워드: ...\n\n${transcript}`,
+        content: `아래 YouTube 자막 내용을 요약해줘.
+
+규칙:
+- 마크다운 리스트(bullet point) 형식으로 작성
+- 글의 핵심 내용을 소주제별로 나누어 정리 (최대 3개)
+- 각 항목은 "**소주제**: 설명" 형태로, 설명은 1~2문장 이내
+- 소주제는 글의 내용에 맞게 자유롭게 구성
+- 마지막에 키워드 최대 3개를 쉼표로 나열
+
+${transcript}`,
       },
     ],
   });
