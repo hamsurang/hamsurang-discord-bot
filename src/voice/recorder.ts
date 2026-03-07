@@ -81,30 +81,40 @@ export function startListening(session: RecordingSession): void {
   const receiver = session.connection.receiver;
   const encoder = new OpusEncoder(SAMPLE_RATE, CHANNELS);
 
+  console.log('[녹음] speaking 이벤트 리스너 등록');
+
   receiver.speaking.on('start', (userId: string) => {
     if (session.userStreams.has(userId)) return;
     session.userStreams.set(userId, null as unknown as NodeJS.Timeout);
+
+    console.log(`[녹음] 유저 ${userId} speaking 감지, 오디오 구독 시작`);
 
     const audioStream = receiver.subscribe(userId, {
       end: { behavior: EndBehaviorType.Manual },
     });
 
+    let packetCount = 0;
     audioStream.on('data', (chunk: Buffer) => {
       try {
         const pcm = encoder.decode(chunk);
+        packetCount++;
+        if (packetCount <= 3) {
+          console.log(`[녹음] 유저 ${userId} 패킷 #${packetCount} 수신 (Opus: ${chunk.length}B -> PCM: ${pcm.length}B)`);
+        }
         const existing = session.mixBuffer.get(userId);
         if (existing) {
           session.mixBuffer.set(userId, Buffer.concat([existing, pcm]));
         } else {
           session.mixBuffer.set(userId, pcm);
         }
-      } catch {
-        // 디코딩 실패 무시
+      } catch (err) {
+        console.error(`[녹음] Opus 디코딩 실패 (유저: ${userId}):`, err);
       }
     });
   });
 
   // 60ms마다 믹스 버퍼를 합쳐서 파일에 쓰기
+  let mixCount = 0;
   session.mixInterval = setInterval(() => {
     if (session.mixBuffer.size === 0) return;
 
@@ -130,6 +140,11 @@ export function startListening(session: RecordingSession): void {
     const stream = getOrCreateChunkStream(session);
     stream.write(mixed);
     session.currentChunkSize += mixed.length;
+
+    mixCount++;
+    if (mixCount <= 5 || mixCount % 500 === 0) {
+      console.log(`[녹음] 믹스 #${mixCount} — 청크 크기: ${(session.currentChunkSize / 1024).toFixed(1)}KB`);
+    }
   }, 60);
 
   // 10초마다 청크 크기 체크 → 20MB 초과 시 STT 처리

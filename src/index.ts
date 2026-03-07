@@ -40,23 +40,28 @@ for (const folder of commandFolders) {
 }
 
 client.once(Events.ClientReady, (readyClient) => {
-  console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+  console.log(`[봇] Ready! Logged in as ${readyClient.user.tag}`);
+  console.log(`[봇] 등록된 커맨드: ${[...client.commands.keys()].join(', ')}`);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
+  console.log(`[커맨드] "${interaction.commandName}" 수신 (유저: ${interaction.user.tag}, 길드: ${interaction.guildId})`);
+
   const command = interaction.client.commands.get(interaction.commandName);
 
   if (!command) {
-    console.error(`No command matching ${interaction.commandName} was found.`);
+    console.error(`[커맨드] "${interaction.commandName}" 매칭 실패 — 등록된 커맨드에 없음`);
     return;
   }
 
   try {
+    console.log(`[커맨드] "${interaction.commandName}" 실행 시작`);
     await command.execute(interaction);
+    console.log(`[커맨드] "${interaction.commandName}" 실행 완료`);
   } catch (error) {
-    console.error(error);
+    console.error(`[커맨드] "${interaction.commandName}" 실행 중 에러:`, error);
     try {
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp({
@@ -69,7 +74,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           flags: MessageFlags.Ephemeral,
         });
       }
-    } catch {}
+    } catch (replyError) {
+      console.error('[커맨드] 에러 응답도 실패:', replyError);
+    }
   }
 });
 

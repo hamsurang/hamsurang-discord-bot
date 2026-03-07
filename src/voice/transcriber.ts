@@ -39,14 +39,22 @@ function pcmToWav(pcmPath: string): string {
 }
 
 export async function transcribePcmFile(pcmPath: string): Promise<string> {
+  console.log(`[STT] PCM 파일: ${pcmPath}`);
+  const pcmSize = fs.statSync(pcmPath).size;
+  console.log(`[STT] PCM 크기: ${(pcmSize / 1024 / 1024).toFixed(2)}MB`);
+
   const wavPath = pcmToWav(pcmPath);
+  const wavSize = fs.statSync(wavPath).size;
+  console.log(`[STT] WAV 변환 완료: ${wavPath} (${(wavSize / 1024 / 1024).toFixed(2)}MB)`);
 
   try {
+    console.log('[STT] Whisper API 호출 시작...');
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(wavPath),
       model: 'whisper-1',
       language: 'ko',
     });
+    console.log(`[STT] Whisper 결과: "${transcription.text.slice(0, 100)}..." (길이: ${transcription.text.length})`);
     return transcription.text;
   } finally {
     try { fs.unlinkSync(wavPath); } catch {}

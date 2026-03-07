@@ -116,12 +116,15 @@ export async function onMessageCreate(message: Message): Promise<void> {
   if (!match) return;
 
   const rawUrl = match[0];
+  console.log(`[링크요약] URL 감지: ${rawUrl} (유저: ${message.author.tag}, 채널: ${message.channelId})`);
   let thread;
 
   try {
     const url = new URL(rawUrl);
     const videoId = extractYouTubeVideoId(rawUrl);
+    console.log(`[링크요약] YouTube 여부: ${videoId ? `ID=${videoId}` : '아님'}`);
     const threadName = (await fetchOgTitle(rawUrl)) ?? url.hostname.replace(/^www\./, '');
+    console.log(`[링크요약] 스레드 이름: "${threadName}"`);
     const channel = message.channel;
 
     if ('threads' in channel) {
@@ -129,8 +132,10 @@ export async function onMessageCreate(message: Message): Promise<void> {
         name: threadName,
         autoArchiveDuration: ThreadAutoArchiveDuration.OneDay,
       });
+      console.log(`[링크요약] 스레드 생성 완료: ${thread.id}`);
     }
-  } catch {
+  } catch (err) {
+    console.error('[링크요약] 스레드 생성 실패:', err);
     return;
   }
 
@@ -140,9 +145,11 @@ export async function onMessageCreate(message: Message): Promise<void> {
 
   try {
     const videoId = extractYouTubeVideoId(rawUrl);
+    console.log(`[링크요약] 요약 시작 (${videoId ? 'YouTube' : '일반 웹페이지'})`);
     const summary = videoId
       ? await fetchAndSummarizeYouTube(videoId, rawUrl)
       : await fetchAndSummarize(rawUrl);
+    console.log(`[링크요약] 요약 완료 (길이: ${summary.length})`);
     const keywordMatch = summary.match(/키워드:\s*(.+)/);
     const summaryText = summary.replace(/키워드:\s*.+/, '').trim();
     const keywords = keywordMatch?.[1]
@@ -162,8 +169,9 @@ export async function onMessageCreate(message: Message): Promise<void> {
       embed.addFields({ name: '🏷️ 키워드', value: keywords });
     }
     await placeholder.edit({ content: '', embeds: [embed] });
+    console.log(`[링크요약] 임베드 게시 완료: ${rawUrl}`);
   } catch (error) {
-    console.error('요약 실패:', error);
+    console.error('[링크요약] 요약 실패:', error);
     await placeholder.edit('링크 내용을 읽어오는 데 실패했습니다.');
   }
 }
