@@ -1,5 +1,5 @@
 import { ChatInputCommandInteraction, GuildMember, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { joinVoiceChannel } from '@discordjs/voice';
+import { joinVoiceChannel, VoiceConnectionStatus, entersState } from '@discordjs/voice';
 import { Command } from '../../types';
 import { activeSessions, createSession, startListening } from '../../voice/recorder';
 
@@ -28,6 +28,8 @@ const command: Command = {
       return;
     }
 
+    await interaction.deferReply();
+
     const connection = joinVoiceChannel({
       channelId: voiceChannel.id,
       guildId: interaction.guildId!,
@@ -35,10 +37,18 @@ const command: Command = {
       selfDeaf: false,
     });
 
+    try {
+      await entersState(connection, VoiceConnectionStatus.Ready, 15_000);
+    } catch {
+      connection.destroy();
+      await interaction.editReply('음성채널 연결에 실패했습니다.');
+      return;
+    }
+
     const session = createSession(interaction.guildId!, voiceChannel.id, connection);
     startListening(session);
 
-    await interaction.reply(`녹음을 시작합니다 🎙️ (채널: ${voiceChannel.name})`);
+    await interaction.editReply(`녹음을 시작합니다 🎙️ (채널: ${voiceChannel.name})`);
   },
 };
 
