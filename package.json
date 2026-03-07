@@ -1,0 +1,30 @@
+{
+  "name": "공유해봇",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "deploy": "tsx src/deploy-commands.ts",
+    "lint": "eslint ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.30.3",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "discord.js": "^14.25.1",
+    "node-html-parser": "^7.1.0",
+    "youtube-transcript": "^1.2.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.19.15",
+    "eslint": "^10.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
