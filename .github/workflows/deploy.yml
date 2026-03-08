@@ -1,0 +1,22 @@
+name: Deploy to Lightsail
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USERNAME }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script: |
+            cd ~/hamsurang-discord-bot
+            git pull origin main
+            pnpm install --frozen-lockfile
+            pnpm build
+            pm2 restart ecosystem.config.cjs --env production
