@@ -14,7 +14,6 @@ import {
 import { transcribePcmFile } from "../../voice/transcriber";
 import { summarizeTranscript } from "../../voice/summarizer";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName("요약끝")
@@ -89,5 +88,4 @@ const command: Command = {
   },
 };
 
-// NOTE: Lightsail 배포 시 음성 관련 의존성 미지원으로 비활성화
-// module.exports = command;
+module.exports = command;

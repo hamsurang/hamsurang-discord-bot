@@ -16,7 +16,6 @@ import {
   startListening,
 } from "../../voice/recorder";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName("요약시작")
@@ -92,5 +91,4 @@ const command: Command = {
   },
 };
 
-// NOTE: Lightsail 배포 시 음성 관련 의존성 미지원으로 비활성화
-// module.exports = command;
+module.exports = command;
