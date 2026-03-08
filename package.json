@@ -1,6 +1,6 @@
 {
   "name": "hamusrang-discord-bot",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "함수랑 산악회 디스코드 내에서 사용하는 discord bot 입니다. ",
   "main": "dist/index.js",
   "scripts": {
