@@ -1,10 +1,10 @@
 import { EmbedBuilder, Message, ThreadAutoArchiveDuration } from 'discord.js';
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import { parse } from 'node-html-parser';
 import { YoutubeTranscript } from 'youtube-transcript';
-import { anthropicApiKey, allowedChannelIds } from '../../config.json';
+import { geminiApiKey, allowedChannelIds } from '../../config.json';
 
-const anthropic = new Anthropic({ apiKey: anthropicApiKey });
+const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
 const URL_REGEX = /https?:\/\/[^\s]+/;
 
@@ -21,19 +21,12 @@ async function fetchAndSummarize(url: string): Promise<string> {
   const text = root.querySelector('main, article, body')?.text ?? root.text;
   const cleaned = text.replace(/\s+/g, ' ').trim().slice(0, 8000);
 
-  const result = await anthropic.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: `아래 웹페이지를 한국어 2~3문장으로 요약하고, 대표 키워드 최대 3개를 쉼표로 나열해줘.\n형식:\n요약: ...\n키워드: ...\n\n${cleaned}`,
-      },
-    ],
+  const result = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: `아래 웹페이지를 한국어 2~3문장으로 요약하고, 대표 키워드 최대 3개를 쉼표로 나열해줘.\n형식:\n요약: ...\n키워드: ...\n\n${cleaned}`,
   });
 
-  const block = result.content[0];
-  return block.type === 'text' ? block.text : '요약을 생성할 수 없습니다.';
+  return result.text ?? '요약을 생성할 수 없습니다.';
 }
 
 function extractYouTubeVideoId(url: string): string | null {
@@ -74,19 +67,12 @@ async function fetchAndSummarizeYouTube(videoId: string, url: string): Promise<s
     return '자막을 찾을 수 없습니다. 자막이 비활성화되었거나 지원되지 않는 영상입니다.';
   }
 
-  const result = await anthropic.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: `아래 YouTube 자막을 한국어 2~3문장으로 요약하고, 대표 키워드 최대 3개를 쉼표로 나열해줘.\n형식:\n요약: ...\n키워드: ...\n\n${transcript}`,
-      },
-    ],
+  const result = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: `아래 YouTube 자막을 한국어 2~3문장으로 요약하고, 대표 키워드 최대 3개를 쉼표로 나열해줘.\n형식:\n요약: ...\n키워드: ...\n\n${transcript}`,
   });
 
-  const block = result.content[0];
-  return block.type === 'text' ? block.text : '요약을 생성할 수 없습니다.';
+  return result.text ?? '요약을 생성할 수 없습니다.';
 }
 
 export async function onMessageCreate(message: Message): Promise<void> {
@@ -122,9 +108,7 @@ export async function onMessageCreate(message: Message): Promise<void> {
 
   try {
     const videoId = extractYouTubeVideoId(rawUrl);
-    const summary = videoId
-      ? await fetchAndSummarizeYouTube(videoId, rawUrl)
-      : await fetchAndSummarize(rawUrl);
+    const summary = videoId ? await fetchAndSummarizeYouTube(videoId, rawUrl) : await fetchAndSummarize(rawUrl);
     const keywordMatch = summary.match(/키워드:\s*(.+)/);
     const summaryText = summary.replace(/키워드:\s*.+/, '').trim();
     const keywords = keywordMatch?.[1]
