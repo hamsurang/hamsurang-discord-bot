@@ -1,10 +1,10 @@
 import { EmbedBuilder, Message, ThreadAutoArchiveDuration } from 'discord.js';
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import { parse } from 'node-html-parser';
 import { YoutubeTranscript } from 'youtube-transcript';
-import { anthropicApiKey, allowedChannelIds } from '../../config.json';
+import { geminiApiKey, allowedChannelIds } from '../../config.json';
 
-const anthropic = new Anthropic({ apiKey: anthropicApiKey, maxRetries: 5 });
+const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
 const URL_REGEX = /https?:\/\/[^\s]+/;
 
@@ -21,13 +21,9 @@ async function fetchAndSummarize(url: string): Promise<string> {
   const text = root.querySelector('main, article, body')?.text ?? root.text;
   const cleaned = text.replace(/\s+/g, ' ').trim().slice(0, 8000);
 
-  const result = await anthropic.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: `아래 웹페이지 내용을 요약해줘.
+  const result = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: `아래 웹페이지 내용을 요약해줘.
 
 규칙:
 - 마크다운 리스트(bullet point) 형식으로 작성
@@ -37,12 +33,9 @@ async function fetchAndSummarize(url: string): Promise<string> {
 - 마지막에 키워드 최대 3개를 쉼표로 나열
 
 ${cleaned}`,
-      },
-    ],
   });
 
-  const block = result.content[0];
-  return block.type === 'text' ? block.text : '요약을 생성할 수 없습니다.';
+  return result.text ?? '요약을 생성할 수 없습니다.';
 }
 
 function extractYouTubeVideoId(url: string): string | null {
@@ -83,13 +76,9 @@ async function fetchAndSummarizeYouTube(videoId: string, url: string): Promise<s
     return '자막을 찾을 수 없습니다. 자막이 비활성화되었거나 지원되지 않는 영상입니다.';
   }
 
-  const result = await anthropic.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: `아래 YouTube 자막 내용을 요약해줘.
+  const result = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: `아래 YouTube 자막 내용을 요약해줘.
 
 규칙:
 - 마크다운 리스트(bullet point) 형식으로 작성
@@ -99,12 +88,9 @@ async function fetchAndSummarizeYouTube(videoId: string, url: string): Promise<s
 - 마지막에 키워드 최대 3개를 쉼표로 나열
 
 ${transcript}`,
-      },
-    ],
   });
 
-  const block = result.content[0];
-  return block.type === 'text' ? block.text : '요약을 생성할 수 없습니다.';
+  return result.text ?? '요약을 생성할 수 없습니다.';
 }
 
 export async function onMessageCreate(message: Message): Promise<void> {
