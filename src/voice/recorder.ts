@@ -1,8 +1,8 @@
-import { VoiceConnection, EndBehaviorType } from '@discordjs/voice';
-import { OpusEncoder } from '@discordjs/opus';
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
+import { VoiceConnection, EndBehaviorType } from "@discordjs/voice";
+import { OpusEncoder } from "@discordjs/opus";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 
 const SAMPLE_RATE = 48000;
 const CHANNELS = 2;
@@ -30,7 +30,7 @@ export function createSession(
   channelId: string,
   connection: VoiceConnection,
 ): RecordingSession {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'discord-voice-'));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "discord-voice-"));
 
   const session: RecordingSession = {
     guildId,
@@ -53,7 +53,10 @@ export function createSession(
 
 function getOrCreateChunkStream(session: RecordingSession): fs.WriteStream {
   if (!session.currentWriteStream) {
-    const filePath = path.join(session.tmpDir, `chunk_${session.chunkIndex}.pcm`);
+    const filePath = path.join(
+      session.tmpDir,
+      `chunk_${session.chunkIndex}.pcm`,
+    );
     session.currentWriteStream = fs.createWriteStream(filePath);
     session.currentChunkSize = 0;
   }
@@ -81,9 +84,9 @@ export function startListening(session: RecordingSession): void {
   const receiver = session.connection.receiver;
   const encoder = new OpusEncoder(SAMPLE_RATE, CHANNELS);
 
-  console.log('[녹음] speaking 이벤트 리스너 등록');
+  console.log("[녹음] speaking 이벤트 리스너 등록");
 
-  receiver.speaking.on('start', (userId: string) => {
+  receiver.speaking.on("start", (userId: string) => {
     if (session.userStreams.has(userId)) return;
     session.userStreams.set(userId, null as unknown as NodeJS.Timeout);
 
@@ -93,17 +96,19 @@ export function startListening(session: RecordingSession): void {
       end: { behavior: EndBehaviorType.Manual },
     });
 
-    audioStream.on('error', (err) => {
+    audioStream.on("error", (err) => {
       console.error(`[녹음] audioStream 에러 (유저: ${userId}):`, err.message);
     });
 
     let packetCount = 0;
-    audioStream.on('data', (chunk: Buffer) => {
+    audioStream.on("data", (chunk: Buffer) => {
       try {
         const pcm = encoder.decode(chunk);
         packetCount++;
         if (packetCount <= 3) {
-          console.log(`[녹음] 유저 ${userId} 패킷 #${packetCount} 수신 (Opus: ${chunk.length}B -> PCM: ${pcm.length}B)`);
+          console.log(
+            `[녹음] 유저 ${userId} 패킷 #${packetCount} 수신 (Opus: ${chunk.length}B -> PCM: ${pcm.length}B)`,
+          );
         }
         const existing = session.mixBuffer.get(userId);
         if (existing) {
@@ -147,7 +152,9 @@ export function startListening(session: RecordingSession): void {
 
     mixCount++;
     if (mixCount <= 5 || mixCount % 500 === 0) {
-      console.log(`[녹음] 믹스 #${mixCount} — 청크 크기: ${(session.currentChunkSize / 1024).toFixed(1)}KB`);
+      console.log(
+        `[녹음] 믹스 #${mixCount} — 청크 크기: ${(session.currentChunkSize / 1024).toFixed(1)}KB`,
+      );
     }
   }, 60);
 
@@ -157,13 +164,13 @@ export function startListening(session: RecordingSession): void {
       const chunkPath = rotateChunk(session);
       if (chunkPath) {
         try {
-          const { transcribePcmFile } = await import('./transcriber');
+          const { transcribePcmFile } = await import("./transcriber");
           const text = await transcribePcmFile(chunkPath);
           if (text.trim()) {
             session.transcribedTexts.push(text);
           }
         } catch (err) {
-          console.error('주기적 STT 실패:', err);
+          console.error("주기적 STT 실패:", err);
         }
       }
     }
