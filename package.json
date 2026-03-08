@@ -1,14 +1,24 @@
 {
-  "name": "공유해봇",
-  "version": "1.0.0",
-  "description": "",
+  "name": "hamusrang-discord-bot",
+  "version": "0.0.1",
+  "description": "함수랑 산악회 디스코드 내에서 사용하는 discord bot 입니다. ",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "deploy": "tsx src/deploy-commands.ts",
-    "lint": "eslint ."
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   },
   "keywords": [],
   "author": "",
@@ -30,7 +40,12 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.19.15",
     "eslint": "^10.0.2",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2",
+    "prettier": "^3.8.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
   }
 }
