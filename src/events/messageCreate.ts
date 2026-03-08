@@ -115,8 +115,12 @@ export async function onMessageCreate(message: Message): Promise<void> {
     console.log(
       `[링크요약] YouTube 여부: ${videoId ? `ID=${videoId}` : "아님"}`,
     );
-    const threadName =
-      (await fetchOgTitle(rawUrl)) ?? parsedUrl.hostname.replace(/^www\./, "");
+    const ogTitle = await fetchOgTitle(rawUrl);
+    const threadName = (
+      ogTitle && ogTitle.length > 0
+        ? ogTitle
+        : parsedUrl.hostname.replace(/^www\./, "")
+    ).slice(0, 100);
     console.log(`[링크요약] 스레드 이름: "${threadName}"`);
     const channel = message.channel;
 
