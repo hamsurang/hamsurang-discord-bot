@@ -4,7 +4,7 @@ import { parse } from 'node-html-parser';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { anthropicApiKey, allowedChannelIds } from '../../config.json';
 
-const anthropic = new Anthropic({ apiKey: anthropicApiKey });
+const anthropic = new Anthropic({ apiKey: anthropicApiKey, maxRetries: 5 });
 
 const URL_REGEX = /https?:\/\/[^\s]+/;
 

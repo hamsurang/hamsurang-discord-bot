@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { anthropicApiKey } from '../../config.json';
 
-const anthropic = new Anthropic({ apiKey: anthropicApiKey });
+const anthropic = new Anthropic({ apiKey: anthropicApiKey, maxRetries: 5 });
 
 export async function summarizeTranscript(texts: string[]): Promise<string> {
   console.log(`[요약] 입력 텍스트 ${texts.length}개, 각 길이: [${texts.map(t => t.length).join(', ')}]`);
