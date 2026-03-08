@@ -25,7 +25,7 @@ jobs:
 
       - name: Create dummy config for CI
         run: |
-          echo '{"token":"","clientId":"","guildId":"","geminiApiKey":"","allowedChannelIds":[],"openaiApiKey":""}' > config.json
+          echo '{"token":"","clientId":"","guildId":"","geminiApiKey":"","allowedChannelIds":[""],"openaiApiKey":""}' > config.json
 
       - name: Lint
         run: pnpm lint
