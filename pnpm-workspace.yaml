@@ -1,3 +1,4 @@
+packages: []
 ignoredBuiltDependencies:
   - '@discordjs/opus'
   - esbuild
