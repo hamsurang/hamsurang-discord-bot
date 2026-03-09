@@ -1,181 +1,48 @@
 import { EmbedBuilder, Message, ThreadAutoArchiveDuration } from "discord.js";
-import { GoogleGenAI } from "@google/genai";
-import { parse } from "node-html-parser";
-import { YoutubeTranscript } from "youtube-transcript";
-import { geminiApiKey, allowedChannelIds } from "../../config.json";
+import { allowedChannelIds } from "../../config.json";
+import { URL_REGEX, extractYouTubeVideoId } from "../utils/url";
+import {
+  fetchPageContent,
+  fetchPageTitle,
+  PageFetchResult,
+} from "../services/pageFetcher";
+import { summarizeContent, summarizeYouTube } from "../services/summarizer";
 
-const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-
-const URL_REGEX = /https?:\/\/[^\s]+/;
-const JINA_READER_PREFIX = "https://r.jina.ai/";
-const MAX_CONTENT_LENGTH = 8_000;
 const THREAD_NAME_MAX_LENGTH = 100;
 const EMBED_COLOR = 0x5865f2;
 
-interface JinaReaderResult {
-  title: string | null;
-  content: string;
-}
-
-async function fetchWithJinaReader(url: string): Promise<JinaReaderResult> {
-  const response = await fetch(`${JINA_READER_PREFIX}${url}`, {
-    headers: { Accept: "text/markdown" },
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Jina Reader failed: ${response.status}`);
-  }
-
-  const markdown = await response.text();
-  const titleMatch = markdown.match(/^Title:\s*(.+)$/m);
-  const title = titleMatch?.[1]?.trim() ?? null;
-
-  const contentStart = markdown.indexOf("Markdown Content:");
-  const content =
-    contentStart !== -1
-      ? markdown.slice(contentStart + "Markdown Content:".length).trim()
-      : markdown;
-
-  return { title, content: content.slice(0, MAX_CONTENT_LENGTH) };
-}
-
-async function fetchWithDirectParse(url: string): Promise<JinaReaderResult> {
-  const response = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; DiscordBot/1.0)" },
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  const html = await response.text();
-  const root = parse(html);
-
-  const ogTitle = root.querySelector('meta[property="og:title"]');
-  const titleTag = root.querySelector("title");
-  const title = ogTitle?.getAttribute("content") ?? titleTag?.text ?? null;
-
-  root
-    .querySelectorAll("script, style, nav, footer, aside")
-    .forEach((el) => el.remove());
-  const text = root.querySelector("main, article, body")?.text ?? root.text;
-  const content = text.replace(/\s+/g, " ").trim().slice(0, MAX_CONTENT_LENGTH);
-
-  return { title, content };
-}
-
-const JINA_MAX_RETRIES = 3;
-const JINA_RETRY_DELAY_MS = 2_000;
-
-async function fetchPageContent(url: string): Promise<JinaReaderResult> {
-  for (let attempt = 1; attempt <= JINA_MAX_RETRIES; attempt++) {
-    try {
-      const result = await fetchWithJinaReader(url);
-      if (result.content.length > 0) return result;
-      console.warn(
-        `[링크요약] Jina Reader 빈 응답 (${attempt}/${JINA_MAX_RETRIES})`,
-      );
-    } catch (err) {
-      console.warn(
-        `[링크요약] Jina Reader 실패 (${attempt}/${JINA_MAX_RETRIES}):`,
-        err,
-      );
-    }
-    if (attempt < JINA_MAX_RETRIES) {
-      await new Promise((r) => setTimeout(r, JINA_RETRY_DELAY_MS));
-    }
-  }
-  console.warn("[링크요약] Jina Reader 재시도 소진, 직접 파싱 fallback");
-  return fetchWithDirectParse(url);
-}
-
-const COMMUNITY_HOSTS = [
-  "linkedin.com",
-  "x.com",
-  "twitter.com",
-  "reddit.com",
-  "news.ycombinator.com",
-  "news.hada.io",
-];
-
-function isCommunityUrl(url: string): boolean {
-  const hostname = new URL(url).hostname.replace(/^www\./, "");
-  return COMMUNITY_HOSTS.some(
-    (h) => hostname === h || hostname.endsWith(`.${h}`),
+async function resolveThreadName(
+  url: string,
+  pageResult: PageFetchResult | null,
+): Promise<string> {
+  const title = pageResult?.title || (await fetchPageTitle(url));
+  const fallback = new URL(url).hostname.replace(/^www\./, "");
+  return (title && title.length > 0 ? title : fallback).slice(
+    0,
+    THREAD_NAME_MAX_LENGTH,
   );
 }
 
-const DEFAULT_PROMPT = `아래 웹페이지 내용을 요약해줘.
+function buildSummaryEmbed(summary: string, url: string): EmbedBuilder {
+  const keywordMatch = summary.match(/키워드:\s*(.+)/);
+  const summaryText = summary.replace(/키워드:\s*.+/, "").trim();
+  const keywords = keywordMatch?.[1]
+    ?.split(",")
+    .map((k) => `\`${k.trim()}\``)
+    .join("  ");
 
-규칙:
-- 마크다운 리스트(bullet point) 형식으로 작성
-- 글의 핵심 내용을 소주제별로 나누어 정리 (최대 3개)
-- 각 항목은 "**소주제**: 설명" 형태로, 설명은 1~2문장 이내
-- 소주제는 글의 내용에 맞게 자유롭게 구성
-- 마지막에 키워드 최대 3개를 쉼표로 나열`;
+  const embed = new EmbedBuilder()
+    .setColor(EMBED_COLOR)
+    .setTitle("링크 요약")
+    .setURL(url)
+    .setDescription(summaryText)
+    .setFooter({ text: url })
+    .setTimestamp();
 
-const COMMUNITY_PROMPT = `아래 커뮤니티 게시글과 댓글/응답을 요약해줘.
-
-규칙:
-- 마크다운 리스트(bullet point) 형식으로 작성
-- 먼저 원글의 핵심 내용을 1~2문장으로 요약
-- 그 다음 "**주요 반응**" 항목으로 댓글/응답 중 인사이트 있는 의견 2~3개를 정리
-- 각 반응은 "— 요약 내용" 형태로, 1문장 이내
-- 마지막에 키워드 최대 3개를 쉼표로 나열`;
-
-async function callGemini(prompt: string): Promise<string> {
-  const result = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
-  return result.text ?? "요약을 생성할 수 없습니다.";
-}
-
-async function summarizeContent(content: string, url: string): Promise<string> {
-  const prompt = isCommunityUrl(url) ? COMMUNITY_PROMPT : DEFAULT_PROMPT;
-  return callGemini(`${prompt}\n\n${content}`);
-}
-
-function extractYouTubeVideoId(url: string): string | null {
-  const parsed = new URL(url);
-  if (parsed.hostname.includes("youtube.com")) {
-    return parsed.searchParams.get("v");
+  if (keywords) {
+    embed.addFields({ name: "🏷️ 키워드", value: keywords });
   }
-  if (parsed.hostname === "youtu.be") {
-    return parsed.pathname.slice(1);
-  }
-  return null;
-}
-
-async function fetchPageTitle(url: string): Promise<string | null> {
-  try {
-    const { title } = await fetchWithDirectParse(url);
-    return title;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchAndSummarizeYouTube(videoId: string): Promise<string> {
-  let transcript: string;
-  try {
-    const items = await YoutubeTranscript.fetchTranscript(videoId);
-    transcript = items
-      .map((item) => item.text)
-      .join(" ")
-      .slice(0, MAX_CONTENT_LENGTH);
-  } catch {
-    return "자막을 찾을 수 없습니다. 자막이 비활성화되었거나 지원되지 않는 영상입니다.";
-  }
-
-  return callGemini(`아래 YouTube 자막 내용을 요약해줘.
-
-규칙:
-- 마크다운 리스트(bullet point) 형식으로 작성
-- 글의 핵심 내용을 소주제별로 나누어 정리 (최대 3개)
-- 각 항목은 "**소주제**: 설명" 형태로, 설명은 1~2문장 이내
-- 소주제는 글의 내용에 맞게 자유롭게 구성
-- 마지막에 키워드 최대 3개를 쉼표로 나열
-
-${transcript}`);
+  return embed;
 }
 
 export async function onMessageCreate(message: Message): Promise<void> {
@@ -194,8 +61,7 @@ export async function onMessageCreate(message: Message): Promise<void> {
   const videoId = extractYouTubeVideoId(rawUrl);
   console.log(`[링크요약] YouTube 여부: ${videoId ? `ID=${videoId}` : "아님"}`);
 
-  // 일반 웹페이지는 Jina Reader → 직접 파싱 fallback으로 fetch
-  let pageResult: JinaReaderResult | null = null;
+  let pageResult: PageFetchResult | null = null;
   if (!videoId) {
     try {
       pageResult = await fetchPageContent(rawUrl);
@@ -209,17 +75,10 @@ export async function onMessageCreate(message: Message): Promise<void> {
 
   let thread;
   try {
-    const parsedUrl = new URL(rawUrl);
-    const pageTitle = pageResult?.title || (await fetchPageTitle(rawUrl));
-    const threadName = (
-      pageTitle && pageTitle.length > 0
-        ? pageTitle
-        : parsedUrl.hostname.replace(/^www\./, "")
-    ).slice(0, THREAD_NAME_MAX_LENGTH);
+    const threadName = await resolveThreadName(rawUrl, pageResult);
     console.log(`[링크요약] 스레드 이름: "${threadName}"`);
-    const channel = message.channel;
 
-    if ("threads" in channel) {
+    if ("threads" in message.channel) {
       thread = await message.startThread({
         name: threadName,
         autoArchiveDuration: ThreadAutoArchiveDuration.OneDay,
@@ -242,7 +101,7 @@ export async function onMessageCreate(message: Message): Promise<void> {
 
     let summary: string;
     if (videoId) {
-      summary = await fetchAndSummarizeYouTube(videoId);
+      summary = await summarizeYouTube(videoId);
     } else if (pageResult) {
       summary = await summarizeContent(pageResult.content, rawUrl);
     } else {
@@ -250,24 +109,7 @@ export async function onMessageCreate(message: Message): Promise<void> {
     }
 
     console.log(`[링크요약] 요약 완료 (길이: ${summary.length})`);
-    const keywordMatch = summary.match(/키워드:\s*(.+)/);
-    const summaryText = summary.replace(/키워드:\s*.+/, "").trim();
-    const keywords = keywordMatch?.[1]
-      ?.split(",")
-      .map((k) => `\`${k.trim()}\``)
-      .join("  ");
-
-    const embed = new EmbedBuilder()
-      .setColor(EMBED_COLOR)
-      .setTitle("링크 요약")
-      .setURL(rawUrl)
-      .setDescription(summaryText)
-      .setFooter({ text: rawUrl })
-      .setTimestamp();
-
-    if (keywords) {
-      embed.addFields({ name: "🏷️ 키워드", value: keywords });
-    }
+    const embed = buildSummaryEmbed(summary, rawUrl);
     await placeholder.edit({ content: "", embeds: [embed] });
     console.log(`[링크요약] 임베드 게시 완료: ${rawUrl}`);
   } catch (error) {
