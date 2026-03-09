@@ -57,7 +57,7 @@ async function fetchWithDirectParse(url: string): Promise<JinaReaderResult> {
     .querySelectorAll("script, style, nav, footer, aside")
     .forEach((el) => el.remove());
   const text = root.querySelector("main, article, body")?.text ?? root.text;
-  const content = text.replace(/\s+/g, " ").trim().slice(0, 8000);
+  const content = text.replace(/\s+/g, " ").trim().slice(0, MAX_CONTENT_LENGTH);
 
   return { title, content };
 }
@@ -121,15 +121,17 @@ const COMMUNITY_PROMPT = `아래 커뮤니티 게시글과 댓글/응답을 요�
 - 각 반응은 "— 요약 내용" 형태로, 1문장 이내
 - 마지막에 키워드 최대 3개를 쉼표로 나열`;
 
-async function summarizeContent(content: string, url: string): Promise<string> {
-  const prompt = isCommunityUrl(url) ? COMMUNITY_PROMPT : DEFAULT_PROMPT;
-
+async function callGemini(prompt: string): Promise<string> {
   const result = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: `${prompt}\n\n${content}`,
+    contents: prompt,
   });
-
   return result.text ?? "요약을 생성할 수 없습니다.";
+}
+
+async function summarizeContent(content: string, url: string): Promise<string> {
+  const prompt = isCommunityUrl(url) ? COMMUNITY_PROMPT : DEFAULT_PROMPT;
+  return callGemini(`${prompt}\n\n${content}`);
 }
 
 function extractYouTubeVideoId(url: string): string | null {
@@ -143,20 +145,10 @@ function extractYouTubeVideoId(url: string): string | null {
   return null;
 }
 
-async function fetchOgTitle(url: string): Promise<string | null> {
+async function fetchPageTitle(url: string): Promise<string | null> {
   try {
-    const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; DiscordBot/1.0)" },
-      signal: AbortSignal.timeout(10_000),
-    });
-    const html = await response.text();
-    const root = parse(html);
-    const ogTitle = root.querySelector('meta[property="og:title"]');
-    if (ogTitle?.getAttribute("content")) {
-      return ogTitle.getAttribute("content")!;
-    }
-    const titleTag = root.querySelector("title");
-    return titleTag?.text ?? null;
+    const { title } = await fetchWithDirectParse(url);
+    return title;
   } catch {
     return null;
   }
@@ -174,9 +166,7 @@ async function fetchAndSummarizeYouTube(videoId: string): Promise<string> {
     return "자막을 찾을 수 없습니다. 자막이 비활성화되었거나 지원되지 않는 영상입니다.";
   }
 
-  const result = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: `아래 YouTube 자막 내용을 요약해줘.
+  return callGemini(`아래 YouTube 자막 내용을 요약해줘.
 
 규칙:
 - 마크다운 리스트(bullet point) 형식으로 작성
@@ -185,10 +175,7 @@ async function fetchAndSummarizeYouTube(videoId: string): Promise<string> {
 - 소주제는 글의 내용에 맞게 자유롭게 구성
 - 마지막에 키워드 최대 3개를 쉼표로 나열
 
-${transcript}`,
-  });
-
-  return result.text ?? "요약을 생성할 수 없습니다.";
+${transcript}`);
 }
 
 export async function onMessageCreate(message: Message): Promise<void> {
@@ -223,7 +210,7 @@ export async function onMessageCreate(message: Message): Promise<void> {
   let thread;
   try {
     const parsedUrl = new URL(rawUrl);
-    const pageTitle = pageResult?.title || (await fetchOgTitle(rawUrl));
+    const pageTitle = pageResult?.title || (await fetchPageTitle(rawUrl));
     const threadName = (
       pageTitle && pageTitle.length > 0
         ? pageTitle
