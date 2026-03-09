@@ -76,6 +76,11 @@ export async function onMessageCreate(message: Message): Promise<void> {
     const threadName = await resolveThreadName(rawUrl, pageResult);
     console.log(`[링크요약] 스레드 이름: "${threadName}"`);
 
+    if (message.hasThread) {
+      console.log("[링크요약] 이미 스레드가 존재하는 메시지, 건너뜀");
+      return;
+    }
+
     if ("threads" in message.channel) {
       thread = await message.startThread({
         name: threadName,
