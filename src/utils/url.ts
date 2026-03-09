@@ -1,6 +1,6 @@
 import { COMMUNITY_HOSTS } from "../constants/hosts";
 
-export const URL_REGEX = /https?:\/\/[^\s]+/;
+export const URL_REGEX = /https?:\/\/[^\s\u2022\u3000-\u9FFF\uAC00-\uD7AF]+/;
 
 export function isCommunityUrl(url: string): boolean {
   const hostname = new URL(url).hostname.replace(/^www\./, "");
