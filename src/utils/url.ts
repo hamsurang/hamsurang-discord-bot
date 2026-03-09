@@ -1,13 +1,6 @@
-export const URL_REGEX = /https?:\/\/[^\s]+/;
+import { COMMUNITY_HOSTS } from "../constants/hosts";
 
-const COMMUNITY_HOSTS = [
-  "linkedin.com",
-  "x.com",
-  "twitter.com",
-  "reddit.com",
-  "news.ycombinator.com",
-  "news.hada.io",
-];
+export const URL_REGEX = /https?:\/\/[^\s]+/;
 
 export function isCommunityUrl(url: string): boolean {
   const hostname = new URL(url).hostname.replace(/^www\./, "");

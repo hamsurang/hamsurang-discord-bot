@@ -1,5 +1,6 @@
 import { EmbedBuilder, Message, ThreadAutoArchiveDuration } from "discord.js";
 import { allowedChannelIds } from "../../config.json";
+import { THREAD_NAME_MAX_LENGTH, EMBED_COLOR } from "../constants/discord";
 import { URL_REGEX, extractYouTubeVideoId } from "../utils/url";
 import {
   fetchPageContent,
@@ -7,9 +8,6 @@ import {
   PageFetchResult,
 } from "../services/pageFetcher";
 import { summarizeContent, summarizeYouTube } from "../services/summarizer";
-
-const THREAD_NAME_MAX_LENGTH = 100;
-const EMBED_COLOR = 0x5865f2;
 
 async function resolveThreadName(
   url: string,

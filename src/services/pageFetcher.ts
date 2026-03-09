@@ -1,13 +1,45 @@
 import { parse } from "node-html-parser";
-
-const JINA_READER_PREFIX = "https://r.jina.ai/";
-const MAX_CONTENT_LENGTH = 8_000;
-const JINA_MAX_RETRIES = 3;
-const JINA_RETRY_DELAY_MS = 2_000;
+import {
+  JINA_READER_PREFIX,
+  MAX_CONTENT_LENGTH,
+  JINA_MAX_RETRIES,
+  JINA_RETRY_DELAY_MS,
+} from "../constants/fetcher";
 
 export interface PageFetchResult {
   title: string | null;
   content: string;
+}
+
+export async function fetchPageContent(url: string): Promise<PageFetchResult> {
+  for (let attempt = 1; attempt <= JINA_MAX_RETRIES; attempt++) {
+    try {
+      const result = await fetchWithJinaReader(url);
+      if (result.content.length > 0) return result;
+      console.warn(
+        `[링크요약] Jina Reader 빈 응답 (${attempt}/${JINA_MAX_RETRIES})`,
+      );
+    } catch (err) {
+      console.warn(
+        `[링크요약] Jina Reader 실패 (${attempt}/${JINA_MAX_RETRIES}):`,
+        err,
+      );
+    }
+    if (attempt < JINA_MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, JINA_RETRY_DELAY_MS));
+    }
+  }
+  console.warn("[링크요약] Jina Reader 재시도 소진, 직접 파싱 fallback");
+  return fetchWithDirectParse(url);
+}
+
+export async function fetchPageTitle(url: string): Promise<string | null> {
+  try {
+    const { title } = await fetchWithDirectParse(url);
+    return title;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchWithJinaReader(url: string): Promise<PageFetchResult> {
@@ -53,35 +85,4 @@ async function fetchWithDirectParse(url: string): Promise<PageFetchResult> {
   const content = text.replace(/\s+/g, " ").trim().slice(0, MAX_CONTENT_LENGTH);
 
   return { title, content };
-}
-
-export async function fetchPageContent(url: string): Promise<PageFetchResult> {
-  for (let attempt = 1; attempt <= JINA_MAX_RETRIES; attempt++) {
-    try {
-      const result = await fetchWithJinaReader(url);
-      if (result.content.length > 0) return result;
-      console.warn(
-        `[링크요약] Jina Reader 빈 응답 (${attempt}/${JINA_MAX_RETRIES})`,
-      );
-    } catch (err) {
-      console.warn(
-        `[링크요약] Jina Reader 실패 (${attempt}/${JINA_MAX_RETRIES}):`,
-        err,
-      );
-    }
-    if (attempt < JINA_MAX_RETRIES) {
-      await new Promise((r) => setTimeout(r, JINA_RETRY_DELAY_MS));
-    }
-  }
-  console.warn("[링크요약] Jina Reader 재시도 소진, 직접 파싱 fallback");
-  return fetchWithDirectParse(url);
-}
-
-export async function fetchPageTitle(url: string): Promise<string | null> {
-  try {
-    const { title } = await fetchWithDirectParse(url);
-    return title;
-  } catch {
-    return null;
-  }
 }
