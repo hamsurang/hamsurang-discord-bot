@@ -88,8 +88,14 @@ export async function onMessageCreate(message: Message): Promise<void> {
       });
       console.log(`[링크요약] 스레드 생성 완료: ${thread.id}`);
     }
-  } catch (err) {
-    console.error("[링크요약] 스레드 생성 실패:", err);
+  } catch (err: unknown) {
+    const isAlreadyCreated =
+      err instanceof Error && "code" in err && err.code === 160004;
+    if (isAlreadyCreated) {
+      console.log("[링크요약] 이미 스레드가 존재하는 메시지, 건너뜀");
+    } else {
+      console.error("[링크요약] 스레드 생성 실패:", err);
+    }
     return;
   }
 
