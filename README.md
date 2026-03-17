@@ -1,10 +1,15 @@
 # 함수랑 공유봇
 
-디스코드 채널의 링크 자동 요약 + 음성 채널 회의 요약 봇
+## 디스코드 채널의 링크 자동 요약 + 음성 채널 회의 요약 봇
 
 |링크 자동 요약|음성 채널 회의 요약|
 |---|---|
 |<img width="846" height="1084" alt="image" src="https://github.com/user-attachments/assets/4cfd608d-dbcf-45c6-904c-e3ce62e7b1cf" />|<img width="402" height="1301" alt="image" src="https://github.com/user-attachments/assets/37840e1d-5b97-45b9-a46c-d775df1924b1" />|
+
+## 주간 랭킹
+
+<img width="561" height="878" alt="image" src="https://github.com/user-attachments/assets/28d070ac-787f-4114-bec4-899b78b4b4f6" />
+
 
 
 ## 사전 요구사항
