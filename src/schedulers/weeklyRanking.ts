@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { Client, TextChannel } from "discord.js";
-import { allowedChannelIds, gaechuChannelId } from "../../config.json";
+import { allowedChannelIds, gaechuChannelId } from "../config";
 import { buildWeeklyRankingEmbed } from "../services/weeklyRankingBuilder";
 
 export function startWeeklyRankingScheduler(client: Client): void {

@@ -23,10 +23,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Create dummy config for CI
-        run: |
-          echo '{"token":"","clientId":"","guildId":"","geminiApiKey":"","allowedChannelIds":[""],"openaiApiKey":"","gaechuChannelId":"","reactionThreshold":3}' > config.json
-
       - name: Lint
         run: pnpm lint
 
@@ -59,7 +55,7 @@ jobs:
           target: ~/hamsurang-discord-bot/
           overwrite: true
 
-      - name: Restart bot
+      - name: Create .env and restart bot
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
@@ -68,6 +64,18 @@ jobs:
           script: |
             set -e
             cd ~/hamsurang-discord-bot
+
+            cat > .env << 'ENVEOF'
+            DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+            DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}
+            DISCORD_GUILD_ID=${{ secrets.DISCORD_GUILD_ID }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            ALLOWED_CHANNEL_IDS=${{ secrets.ALLOWED_CHANNEL_IDS }}
+            GAECHU_CHANNEL_ID=${{ secrets.GAECHU_CHANNEL_ID }}
+            REACTION_THRESHOLD=${{ secrets.REACTION_THRESHOLD }}
+            ENVEOF
+
             git pull origin main
             pnpm install --frozen-lockfile
             pm2 startOrRestart ecosystem.config.cjs --env production

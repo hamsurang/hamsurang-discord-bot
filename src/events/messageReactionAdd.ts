@@ -10,7 +10,7 @@ import {
   allowedChannelIds,
   gaechuChannelId,
   reactionThreshold,
-} from "../../config.json";
+} from "../config";
 import { EMBED_COLOR } from "../constants/discord";
 import { isGaechuSent, markGaechuSent } from "../lib/db";
 

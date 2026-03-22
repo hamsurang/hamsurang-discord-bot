@@ -8,7 +8,7 @@ import {
   MessageFlags,
   Partials,
 } from "discord.js";
-import { token } from "../config.json";
+import { token } from "./config";
 import { Command } from "./types";
 import { onMessageCreate } from "./events/messageCreate";
 import { onMessageReactionAdd } from "./events/messageReactionAdd";

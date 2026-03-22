@@ -1,5 +1,5 @@
 import { EmbedBuilder, Message, ThreadAutoArchiveDuration } from "discord.js";
-import { allowedChannelIds } from "../../config.json";
+import { allowedChannelIds } from "../config";
 import { THREAD_NAME_MAX_LENGTH, EMBED_COLOR } from "../constants/discord";
 import { URL_REGEX, extractYouTubeVideoId } from "../utils/url";
 import {
