@@ -30,20 +30,6 @@ function getMaxReactionCount(
   );
 }
 
-/**
- * 메시지가 속한 실제 채널 ID를 반환.
- * 스레드 내 메시지는 channelId가 스레드 ID이므로 parentId를 사용한다.
- */
-function getSourceChannelId(
-  message: MessageReaction["message"],
-): string | null {
-  const channel = message.channel;
-  if (channel.isThread()) {
-    return channel.parentId;
-  }
-  return channel.id;
-}
-
 function buildGaechuMetaEmbed(
   message: MessageReaction["message"],
   threadUrl?: string,
@@ -162,9 +148,10 @@ export async function onMessageReactionAdd(
   // 설정 검증
   if (!gaechuChannelId) return;
 
-  // 스레드 내 메시지는 parentId로 채널 확인
-  const sourceChannelId = getSourceChannelId(message);
-  if (!sourceChannelId || !allowedChannelIds.includes(sourceChannelId)) return;
+  // 스레드 내 댓글은 개추 대상이 아님 (스레드를 시작한 원본 메시지만 대상)
+  if (message.channel.isThread()) return;
+
+  if (!allowedChannelIds.includes(message.channelId)) return;
 
   // 최대 리액션 수 확인 (단일 이모지 중 최대값)
   const maxCount = getMaxReactionCount(reaction);
@@ -176,7 +163,7 @@ export async function onMessageReactionAdd(
 
   try {
     console.log(
-      `[개추해] 임계값 도달: ${maxCount}개 (메시지: ${message.id}, 채널: ${sourceChannelId})`,
+      `[개추해] 임계값 도달: ${maxCount}개 (메시지: ${message.id}, 채널: ${message.channelId})`,
     );
 
     // 개추해 채널 가져오기
