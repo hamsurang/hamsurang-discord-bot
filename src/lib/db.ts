@@ -1,7 +1,12 @@
+import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 
-const DB_PATH = path.join(__dirname, "../../data/gaechu.db");
+const DB_DIR = path.join(__dirname, "../../data");
+const DB_PATH = path.join(DB_DIR, "gaechu.db");
+
+// data/ 디렉토리가 없으면 자동 생성 (fresh deploy 대응)
+fs.mkdirSync(DB_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
 
@@ -15,17 +20,18 @@ db.exec(`
   )
 `);
 
+// prepared statement 캐싱
+const selectStmt = db.prepare("SELECT 1 FROM gaechu_sent WHERE message_id = ?");
+const insertStmt = db.prepare(
+  "INSERT OR IGNORE INTO gaechu_sent (message_id) VALUES (?)",
+);
+
 /** 이미 개추된 메시지인지 확인 */
 export function isGaechuSent(messageId: string): boolean {
-  const row = db
-    .prepare("SELECT 1 FROM gaechu_sent WHERE message_id = ?")
-    .get(messageId);
-  return !!row;
+  return !!selectStmt.get(messageId);
 }
 
 /** 개추 완료된 메시지 ID 기록 */
 export function markGaechuSent(messageId: string): void {
-  db.prepare("INSERT OR IGNORE INTO gaechu_sent (message_id) VALUES (?)").run(
-    messageId,
-  );
+  insertStmt.run(messageId);
 }

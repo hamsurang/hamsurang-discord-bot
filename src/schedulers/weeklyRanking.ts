@@ -16,12 +16,19 @@ export function startWeeklyRankingScheduler(client: Client): void {
       console.log("[스케줄러] 주간 랭킹 자동 게시 시작");
 
       try {
-        // 소스 채널들에서 메시지 수집
+        // 소스 채널들에서 메시지 수집 (개별 채널 실패 시 나머지 계속 진행)
         const sourceChannels: TextChannel[] = [];
         for (const channelId of allowedChannelIds) {
-          const ch = await client.channels.fetch(channelId);
-          if (ch instanceof TextChannel) {
-            sourceChannels.push(ch);
+          try {
+            const ch = await client.channels.fetch(channelId);
+            if (ch instanceof TextChannel) {
+              sourceChannels.push(ch);
+            }
+          } catch (err) {
+            console.error(
+              `[스케줄러] 채널 ${channelId} fetch 실패, 스킵:`,
+              err,
+            );
           }
         }
 
