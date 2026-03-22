@@ -48,6 +48,7 @@ function getSourceChannelId(
 
 function buildGaechuMetaEmbed(
   message: MessageReaction["message"],
+  threadUrl?: string,
 ): EmbedBuilder {
   const author = message.author;
   const content = message.content ?? "";
@@ -65,6 +66,13 @@ function buildGaechuMetaEmbed(
     });
   }
 
+  if (threadUrl) {
+    embed.addFields({
+      name: "💬 원본 스레드",
+      value: `[보러가기](${threadUrl})`,
+    });
+  }
+
   return embed;
 }
 
@@ -75,14 +83,27 @@ function buildGaechuMetaEmbed(
 async function buildGaechuPayload(
   message: MessageReaction["message"],
 ): Promise<{ embeds: EmbedBuilder[]; files: string[] }> {
-  const metaEmbed = buildGaechuMetaEmbed(message);
-
   // 원본 메시지의 기존 임베드 복제 (링크 요약 등)
   const originalEmbeds = message.embeds.map((e) => EmbedBuilder.from(e));
 
-  // 스레드에 달린 봇의 요약 임베드도 가져오기
-  const thread = message.thread;
+  // 스레드 fetch — message.thread가 캐시에 없을 수 있으므로 hasThread로 확인 후 fetch
+  let threadUrl: string | undefined;
+  let thread = message.thread;
+  if (!thread && message.hasThread) {
+    try {
+      const channel = message.channel;
+      if ("threads" in channel && channel.threads) {
+        thread = await channel.threads.fetch(message.id);
+      }
+    } catch {
+      // 스레드 fetch 실패 시 무시
+    }
+  }
+
   if (thread) {
+    threadUrl = `https://discord.com/channels/${thread.guildId}/${thread.id}`;
+
+    // 스레드에 달린 봇의 요약 임베드 가져오기
     try {
       const threadMessages = await thread.messages.fetch({ limit: 10 });
       for (const tm of threadMessages.values()) {
@@ -94,6 +115,8 @@ async function buildGaechuPayload(
       // 스레드 메시지 fetch 실패 시 무시
     }
   }
+
+  const metaEmbed = buildGaechuMetaEmbed(message, threadUrl);
 
   // 첨부파일 URL 수집
   const files = message.attachments.map((a) => a.url);
