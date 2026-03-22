@@ -1,10 +1,15 @@
 import { EmbedBuilder, Message, TextChannel } from "discord.js";
+import { EMBED_COLOR } from "../constants/discord";
+import { SEVEN_DAYS_MS } from "../constants/time";
 import { URL_REGEX } from "../utils/url";
+
+const TOP_N = 3;
+const PREVIEW_MAX_LENGTH = 60;
 
 async function fetchMessagesForLastWeek(
   channel: TextChannel,
 ): Promise<Message[]> {
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = Date.now() - SEVEN_DAYS_MS;
   const allMessages: Message[] = [];
   let lastId: string | undefined;
 
@@ -53,21 +58,21 @@ export async function buildWeeklyRankingEmbed(
     }))
     .filter((item) => item.totalReactions > 0)
     .sort((a, b) => b.totalReactions - a.totalReactions)
-    .slice(0, 3);
+    .slice(0, TOP_N);
 
   const threadTop3 = allMessages
     .filter((m) => m.thread && (m.thread.messageCount ?? 0) > 0)
     .map((m) => ({
       message: m,
-      commentCount: m.thread!.messageCount ?? 0,
+      commentCount: m.thread?.messageCount ?? 0,
     }))
     .sort((a, b) => b.commentCount - a.commentCount)
-    .slice(0, 3);
+    .slice(0, TOP_N);
 
   const medals = ["🥇", "🥈", "🥉"];
 
   const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
+    .setColor(EMBED_COLOR)
     .setTitle("주간 랭킹 (지난 7일)")
     .setTimestamp();
 
@@ -80,7 +85,10 @@ export async function buildWeeklyRankingEmbed(
   } else {
     const lines = reactionTop3.map((item, i) => {
       const url = item.message.content.match(URL_REGEX)?.[0] ?? "";
-      const preview = url.length > 60 ? url.slice(0, 60) + "..." : url;
+      const preview =
+        url.length > PREVIEW_MAX_LENGTH
+          ? url.slice(0, PREVIEW_MAX_LENGTH) + "..."
+          : url;
       const author =
         item.message.author.displayName ?? item.message.author.username;
       const threadName = item.message.thread?.name ?? "";
@@ -99,8 +107,8 @@ export async function buildWeeklyRankingEmbed(
   } else {
     const lines = threadTop3.map((item, i) => {
       const preview =
-        item.message.content.length > 60
-          ? item.message.content.slice(0, 60) + "..."
+        item.message.content.length > PREVIEW_MAX_LENGTH
+          ? item.message.content.slice(0, PREVIEW_MAX_LENGTH) + "..."
           : item.message.content || "(내용 없음)";
       const author =
         item.message.author.displayName ?? item.message.author.username;
@@ -115,19 +123,18 @@ export async function buildWeeklyRankingEmbed(
 
   const addCount = (
     map: Map<string, CountEntry>,
-    id: string,
-    displayName: string,
+    author: { id: string; displayName: string },
     amount = 1,
   ) => {
-    const existing = map.get(id);
+    const existing = map.get(author.id);
     if (existing) existing.count += amount;
-    else map.set(id, { count: amount, displayName });
+    else map.set(author.id, { count: amount, displayName: author.displayName });
   };
 
   const formatTop3 = (map: Map<string, CountEntry>) =>
     [...map.entries()]
       .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 3)
+      .slice(0, TOP_N)
       .map(
         ([, { count, displayName }], i) =>
           `${i + 1}. ${displayName} (${count}개)`,
@@ -147,21 +154,18 @@ export async function buildWeeklyRankingEmbed(
 
   for (const m of allMessages) {
     if (m.author.bot) continue;
-    const displayName = m.author.displayName ?? m.author.username;
-    addCount(messageCounts, m.author.id, displayName);
-    if (URL_REGEX.test(m.content))
-      addCount(urlCounts, m.author.id, displayName);
+    const author = {
+      id: m.author.id,
+      displayName: m.author.displayName ?? m.author.username,
+    };
+    addCount(messageCounts, author);
+    if (URL_REGEX.test(m.content)) addCount(urlCounts, author);
     const totalReactions = m.reactions.cache.reduce(
       (sum, r) => sum + (r.count ?? 0),
       0,
     );
     if (totalReactions > 0)
-      addCount(
-        reactionReceivedCounts,
-        m.author.id,
-        displayName,
-        totalReactions,
-      );
+      addCount(reactionReceivedCounts, author, totalReactions);
   }
 
   const reactionGivenCounts = new Map<string, CountEntry>();
@@ -177,11 +181,10 @@ export async function buildWeeklyRankingEmbed(
       for (const users of userCollections) {
         for (const user of users.values()) {
           if (user.bot) continue;
-          addCount(
-            reactionGivenCounts,
-            user.id,
-            user.displayName ?? user.username,
-          );
+          addCount(reactionGivenCounts, {
+            id: user.id,
+            displayName: user.displayName ?? user.username,
+          });
         }
       }
     }),

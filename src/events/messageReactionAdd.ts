@@ -12,6 +12,7 @@ import {
   reactionThreshold,
 } from "../../config.json";
 import { EMBED_COLOR } from "../constants/discord";
+import { SEVEN_DAYS_MS } from "../constants/time";
 import { URL_REGEX } from "../utils/url";
 
 /**
@@ -111,7 +112,7 @@ async function findInGaechuChannel(
     fields: { name: string; value: string }[];
   }) => boolean,
 ): Promise<{ messageId: string; currentMax: number } | null> {
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = Date.now() - SEVEN_DAYS_MS;
   let lastId: string | undefined;
 
   while (true) {
