@@ -69,7 +69,7 @@ jobs:
               "DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}" \
               "DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}" \
               "DISCORD_GUILD_ID=${{ secrets.DISCORD_GUILD_ID }}" \
-              "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
+              "GEMINI_API_KEYS=${{ secrets.GEMINI_API_KEYS }}" \
               "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" \
               "ALLOWED_CHANNEL_IDS=${{ secrets.ALLOWED_CHANNEL_IDS }}" \
               "GAECHU_CHANNEL_ID=${{ secrets.GAECHU_CHANNEL_ID }}" \

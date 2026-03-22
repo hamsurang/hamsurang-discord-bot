@@ -7,7 +7,7 @@ function required(name: string): string {
 export const token = required("DISCORD_TOKEN");
 export const clientId = required("DISCORD_CLIENT_ID");
 export const guildId = required("DISCORD_GUILD_ID");
-export const geminiApiKey = required("GEMINI_API_KEY");
+export const geminiApiKeys = required("GEMINI_API_KEYS").split(",");
 export const openaiApiKey = required("OPENAI_API_KEY");
 export const gaechuChannelId = required("GAECHU_CHANNEL_ID");
 export const allowedChannelIds = required("ALLOWED_CHANNEL_IDS").split(",");
