@@ -78,6 +78,6 @@ jobs:
 
             git pull origin main
             pnpm install --frozen-lockfile
-            nohup pm2 startOrRestart ecosystem.config.cjs --env production > /dev/null 2>&1 &
-            sleep 2
-            pm2 status
+            pm2 delete hamsurang-bot || true
+            pm2 start dist/index.js --name hamsurang-bot --node-args="--env-file=.env"
+            pm2 save
