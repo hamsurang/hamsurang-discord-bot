@@ -48,19 +48,14 @@ function getSourceChannelId(
 
 function buildGaechuMetaEmbed(
   message: MessageReaction["message"],
-  maxCount: number,
 ): EmbedBuilder {
   const author = message.author;
+  const content = message.content ?? "";
 
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR)
     .setTitle("🏆 개추된 글")
-    .setDescription(`[원본 메시지 바로가기](${message.url})`)
-    .addFields({
-      name: "리액션",
-      value: `${maxCount}`,
-      inline: true,
-    })
+    .setDescription(content || "(내용 없음)")
     .setTimestamp(message.createdAt);
 
   if (author) {
@@ -79,9 +74,8 @@ function buildGaechuMetaEmbed(
  */
 async function buildGaechuPayload(
   message: MessageReaction["message"],
-  maxCount: number,
-): Promise<{ content?: string; embeds: EmbedBuilder[]; files: string[] }> {
-  const metaEmbed = buildGaechuMetaEmbed(message, maxCount);
+): Promise<{ embeds: EmbedBuilder[]; files: string[] }> {
+  const metaEmbed = buildGaechuMetaEmbed(message);
 
   // 원본 메시지의 기존 임베드 복제 (링크 요약 등)
   const originalEmbeds = message.embeds.map((e) => EmbedBuilder.from(e));
@@ -104,13 +98,10 @@ async function buildGaechuPayload(
   // 첨부파일 URL 수집
   const files = message.attachments.map((a) => a.url);
 
-  // 원본 메시지 텍스트 내용
-  const content = message.content || undefined;
-
   // Discord 임베드 제한: 최대 10개
   const allEmbeds = [metaEmbed, ...originalEmbeds].slice(0, 10);
 
-  return { content, embeds: allEmbeds, files };
+  return { embeds: allEmbeds, files };
 }
 
 /**
@@ -196,7 +187,7 @@ async function handleDuplicateCheck(
       `[개추해] 중복 발견, 리액션 업데이트: ${existing.currentMax} → ${maxCount}`,
     );
     const existingMsg = await gaechuChannel.messages.fetch(existing.messageId);
-    const payload = await buildGaechuPayload(message, maxCount);
+    const payload = await buildGaechuPayload(message);
     await existingMsg.edit(payload);
   } else {
     console.log("[개추해] 중복이며 기존 리액션이 더 높음, 스킵");
@@ -262,7 +253,7 @@ export async function onMessageReactionAdd(
     if (isDuplicate) return;
 
     // 새 개추 메시지 전송
-    const payload = await buildGaechuPayload(message, maxCount);
+    const payload = await buildGaechuPayload(message);
     await gaechuChannel.send(payload);
     console.log(`[개추해] 개추 완료: ${message.url}`);
   } finally {
