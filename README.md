@@ -51,17 +51,17 @@ pnpm install --force
 
 ## 설정
 
-프로젝트 루트에 `config.json` 파일을 생성하세요 (`.gitignore`에 포함되어 있어 직접 만들어야 합니다):
+프로젝트 루트에 `.env` 파일을 생성하세요 (`.gitignore`에 포함되어 있어 직접 만들어야 합니다):
 
-```json
-{
-  "token": "디스코드 봇 토큰",
-  "clientId": "디스코드 앱 Client ID",
-  "guildId": "디스코드 서버(길드) ID",
-  "geminiApiKey": "Google Gemini API 키",
-  "allowedChannelIds": ["링크 요약을 활성화할 채널 ID"],
-  "openaiApiKey": "OpenAI API 키 (음성 STT용)"
-}
+```env
+DISCORD_TOKEN=디스코드 봇 토큰
+DISCORD_CLIENT_ID=디스코드 앱 Client ID
+DISCORD_GUILD_ID=디스코드 서버(길드) ID
+GEMINI_API_KEYS=Google Gemini API 키1,키2,키3 (콤마 구분, 복수 키 지원)
+OPENAI_API_KEY=OpenAI API 키 (음성 STT용)
+ALLOWED_CHANNEL_IDS=채널ID1,채널ID2
+GAECHU_CHANNEL_ID=개추 채널 ID
+REACTION_THRESHOLD=5
 ```
 
 ### 디스코드 봇 설정 (Developer Portal)
