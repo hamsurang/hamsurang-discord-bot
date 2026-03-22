@@ -13,7 +13,6 @@ import {
 } from "../../config.json";
 import { EMBED_COLOR } from "../constants/discord";
 import { SEVEN_DAYS_MS } from "../constants/time";
-import { URL_REGEX } from "../utils/url";
 
 /**
  * 동시 리액션에 의한 중복 전송 방지.
@@ -72,6 +71,9 @@ function buildGaechuMetaEmbed(
       value: `[보러가기](${threadUrl})`,
     });
   }
+
+  // 중복 체크용 원본 메시지 ID를 footer에 저장
+  embed.setFooter({ text: `원본: ${message.id}` });
 
   return embed;
 }
@@ -135,8 +137,9 @@ async function findInGaechuChannel(
   predicate: (embed: {
     url: string | null;
     fields: { name: string; value: string }[];
+    footer: { text: string } | null;
   }) => boolean,
-): Promise<{ messageId: string; currentMax: number } | null> {
+): Promise<{ messageId: string } | null> {
   const sevenDaysAgo = Date.now() - SEVEN_DAYS_MS;
   let lastId: string | undefined;
 
@@ -155,11 +158,7 @@ async function findInGaechuChannel(
       if (!embed) continue;
 
       if (predicate(embed)) {
-        const reactionField = embed.fields.find((f) => f.name === "리액션");
-        const currentMax = reactionField
-          ? parseInt(reactionField.value, 10)
-          : 0;
-        return { messageId: msg.id, currentMax };
+        return { messageId: msg.id };
       }
     }
 
@@ -193,29 +192,21 @@ async function ensureFullReaction(
   return true;
 }
 
-async function handleDuplicateCheck(
+async function isDuplicateInGaechu(
   gaechuChannel: TextChannel,
-  predicate: (embed: {
+  messageId: string,
+): Promise<boolean> {
+  const predicate = (embed: {
     url: string | null;
     fields: { name: string; value: string }[];
-  }) => boolean,
-  message: MessageReaction["message"],
-  maxCount: number,
-): Promise<boolean> {
-  const existing = await findInGaechuChannel(gaechuChannel, predicate);
-  if (!existing) return false;
+    footer: { text: string } | null;
+  }) => embed.footer?.text === `원본: ${messageId}`;
 
-  if (maxCount > existing.currentMax) {
-    console.log(
-      `[개추해] 중복 발견, 리액션 업데이트: ${existing.currentMax} → ${maxCount}`,
-    );
-    const existingMsg = await gaechuChannel.messages.fetch(existing.messageId);
-    const payload = await buildGaechuPayload(message);
-    await existingMsg.edit(payload);
-  } else {
-    console.log("[개추해] 중복이며 기존 리액션이 더 높음, 스킵");
+  const existing = await findInGaechuChannel(gaechuChannel, predicate);
+  if (existing) {
+    console.log(`[개추해] 이미 개추된 메시지, 스킵 (원본: ${messageId})`);
   }
-  return true;
+  return !!existing;
 }
 
 export async function onMessageReactionAdd(
@@ -256,24 +247,7 @@ export async function onMessageReactionAdd(
       return;
     }
 
-    const content = message.content ?? "";
-    const urlMatch = content.match(URL_REGEX);
-    const url = urlMatch?.[0];
-
-    const predicate = url
-      ? (embed: { url: string | null }) => embed.url === url
-      : (embed: { fields: { name: string; value: string }[] }) => {
-          const linkField = embed.fields.find((f) => f.name === "원본 메시지");
-          return linkField ? linkField.value.includes(message.url) : false;
-        };
-
-    const isDuplicate = await handleDuplicateCheck(
-      gaechuChannel,
-      predicate,
-      message,
-      maxCount,
-    );
-    if (isDuplicate) return;
+    if (await isDuplicateInGaechu(gaechuChannel, message.id)) return;
 
     // 새 개추 메시지 전송
     const payload = await buildGaechuPayload(message);
