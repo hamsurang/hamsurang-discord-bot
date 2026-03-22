@@ -46,42 +46,21 @@ function getSourceChannelId(
   return channel.id;
 }
 
-function buildGaechuEmbed(
+function buildGaechuMetaEmbed(
   message: MessageReaction["message"],
   maxCount: number,
 ): EmbedBuilder {
   const author = message.author;
-  const content = message.content ?? "";
-  const urlMatch = content.match(URL_REGEX);
-  const url = urlMatch?.[0];
-
-  // 스레드 이름: 스레드 안의 메시지이면 channel.name, 스레드를 시작한 메시지이면 thread.name
-  const channel = message.channel;
-  const threadName = channel.isThread() ? channel.name : message.thread?.name;
-
-  // 미리보기에서 URL 제거하여 중복 방지
-  const contentWithoutUrl = url ? content.replace(url, "").trim() : content;
-  const preview =
-    contentWithoutUrl.length > 200
-      ? contentWithoutUrl.slice(0, 200) + "..."
-      : contentWithoutUrl;
 
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR)
     .setTitle("🏆 개추된 글")
-    .setDescription(preview || url || "(내용 없음)")
-    .addFields(
-      {
-        name: "원본 메시지",
-        value: `[바로가기](${message.url})`,
-        inline: true,
-      },
-      {
-        name: "리액션",
-        value: `${maxCount}`,
-        inline: true,
-      },
-    )
+    .setDescription(`[원본 메시지 바로가기](${message.url})`)
+    .addFields({
+      name: "리액션",
+      value: `${maxCount}`,
+      inline: true,
+    })
     .setTimestamp(message.createdAt);
 
   if (author) {
@@ -91,15 +70,47 @@ function buildGaechuEmbed(
     });
   }
 
-  if (url) {
-    embed.setURL(url);
-  }
-
-  if (threadName) {
-    embed.addFields({ name: "스레드", value: threadName, inline: true });
-  }
-
   return embed;
+}
+
+/**
+ * 원본 메시지의 내용, 첨부파일, 기존 임베드(링크 요약 등)를 포함한
+ * 개추 메시지 전송 페이로드를 구성한다.
+ */
+async function buildGaechuPayload(
+  message: MessageReaction["message"],
+  maxCount: number,
+): Promise<{ content?: string; embeds: EmbedBuilder[]; files: string[] }> {
+  const metaEmbed = buildGaechuMetaEmbed(message, maxCount);
+
+  // 원본 메시지의 기존 임베드 복제 (링크 요약 등)
+  const originalEmbeds = message.embeds.map((e) => EmbedBuilder.from(e));
+
+  // 스레드에 달린 봇의 요약 임베드도 가져오기
+  const thread = message.thread;
+  if (thread) {
+    try {
+      const threadMessages = await thread.messages.fetch({ limit: 10 });
+      for (const tm of threadMessages.values()) {
+        if (tm.author.id === message.client.user?.id && tm.embeds.length > 0) {
+          originalEmbeds.push(...tm.embeds.map((e) => EmbedBuilder.from(e)));
+        }
+      }
+    } catch {
+      // 스레드 메시지 fetch 실패 시 무시
+    }
+  }
+
+  // 첨부파일 URL 수집
+  const files = message.attachments.map((a) => a.url);
+
+  // 원본 메시지 텍스트 내용
+  const content = message.content || undefined;
+
+  // Discord 임베드 제한: 최대 10개
+  const allEmbeds = [metaEmbed, ...originalEmbeds].slice(0, 10);
+
+  return { content, embeds: allEmbeds, files };
 }
 
 /**
@@ -185,8 +196,8 @@ async function handleDuplicateCheck(
       `[개추해] 중복 발견, 리액션 업데이트: ${existing.currentMax} → ${maxCount}`,
     );
     const existingMsg = await gaechuChannel.messages.fetch(existing.messageId);
-    const embed = buildGaechuEmbed(message, maxCount);
-    await existingMsg.edit({ embeds: [embed] });
+    const payload = await buildGaechuPayload(message, maxCount);
+    await existingMsg.edit(payload);
   } else {
     console.log("[개추해] 중복이며 기존 리액션이 더 높음, 스킵");
   }
@@ -251,8 +262,8 @@ export async function onMessageReactionAdd(
     if (isDuplicate) return;
 
     // 새 개추 메시지 전송
-    const embed = buildGaechuEmbed(message, maxCount);
-    await gaechuChannel.send({ embeds: [embed] });
+    const payload = await buildGaechuPayload(message, maxCount);
+    await gaechuChannel.send(payload);
     console.log(`[개추해] 개추 완료: ${message.url}`);
   } finally {
     processing.delete(message.id);
