@@ -61,7 +61,6 @@ jobs:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          command_timeout: 30s
           script: |
             set -e
             cd ~/hamsurang-discord-bot
@@ -79,4 +78,6 @@ jobs:
 
             git pull origin main
             pnpm install --frozen-lockfile
-            pm2 startOrRestart ecosystem.config.cjs --env production
+            nohup pm2 startOrRestart ecosystem.config.cjs --env production > /dev/null 2>&1 &
+            sleep 2
+            pm2 status
