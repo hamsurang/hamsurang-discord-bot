@@ -6,10 +6,13 @@ import {
   Events,
   GatewayIntentBits,
   MessageFlags,
+  Partials,
 } from "discord.js";
 import { token } from "../config.json";
 import { Command } from "./types";
 import { onMessageCreate } from "./events/messageCreate";
+import { onMessageReactionAdd } from "./events/messageReactionAdd";
+import { startWeeklyRankingScheduler } from "./schedulers/weeklyRanking";
 
 declare module "discord.js" {
   interface Client {
@@ -23,7 +26,9 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessageReactions,
   ],
+  partials: [Partials.Message, Partials.Reaction, Partials.Channel],
 });
 
 client.commands = new Collection();
@@ -57,6 +62,7 @@ for (const folder of commandFolders) {
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`[봇] Ready! Logged in as ${readyClient.user.tag}`);
   console.log(`[봇] 등록된 커맨드: ${[...client.commands.keys()].join(", ")}`);
+  startWeeklyRankingScheduler(client);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -100,5 +106,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.on(Events.MessageCreate, onMessageCreate);
+client.on(Events.MessageReactionAdd, onMessageReactionAdd);
 
 client.login(token);

@@ -2,6 +2,7 @@ import {
   EmbedBuilder,
   MessageReaction,
   PartialMessageReaction,
+  PartialUser,
   TextChannel,
   User,
 } from "discord.js";
@@ -147,7 +148,7 @@ async function findInGaechuChannel(
 export async function onMessageReactionAdd(
   reaction: MessageReaction | PartialMessageReaction,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _user: User,
+  _user: User | PartialUser,
 ): Promise<void> {
   // partial인 경우 fetch
   if (reaction.partial) {
