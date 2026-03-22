@@ -58,7 +58,7 @@ pnpm install --force
   "token": "디스코드 봇 토큰",
   "clientId": "디스코드 앱 Client ID",
   "guildId": "디스코드 서버(길드) ID",
-  "geminiApiKey": "Google Gemini API 키",
+  "geminiApiKeys": "Google Gemini API 키 (콤마 구분, 복수 키 지원)",
   "allowedChannelIds": ["링크 요약을 활성화할 채널 ID"],
   "openaiApiKey": "OpenAI API 키 (음성 STT용)"
 }
