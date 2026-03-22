@@ -44,7 +44,7 @@ async function computeRankingData(messages: Message[]): Promise<RankingData> {
     .map((m) => ({
       message: m,
       totalReactions: m.reactions.cache.reduce(
-        (sum, r) => sum + (r.count ?? 0),
+        (max, r) => Math.max(max, r.count ?? 0),
         0,
       ),
     }))
@@ -73,12 +73,12 @@ async function computeRankingData(messages: Message[]): Promise<RankingData> {
     };
     addCount(messageCounts, author);
     if (URL_REGEX.test(m.content)) addCount(urlCounts, author);
-    const totalReactions = m.reactions.cache.reduce(
-      (sum, r) => sum + (r.count ?? 0),
+    const maxReactions = m.reactions.cache.reduce(
+      (max, r) => Math.max(max, r.count ?? 0),
       0,
     );
-    if (totalReactions > 0)
-      addCount(reactionReceivedCounts, author, totalReactions);
+    if (maxReactions > 0)
+      addCount(reactionReceivedCounts, author, maxReactions);
   }
 
   const reactionGivenCounts = new Map<string, CountEntry>();
