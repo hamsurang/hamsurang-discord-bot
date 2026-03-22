@@ -146,18 +146,15 @@ async function findInGaechuChannel(
   return null;
 }
 
-export async function onMessageReactionAdd(
+async function ensureFullReaction(
   reaction: MessageReaction | PartialMessageReaction,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _user: User | PartialUser,
-): Promise<void> {
-  // partial인 경우 fetch
+): Promise<boolean> {
   if (reaction.partial) {
     try {
       await reaction.fetch();
     } catch (err) {
       console.error("[개추해] 리액션 fetch 실패:", err);
-      return;
+      return false;
     }
   }
   if (reaction.message.partial) {
@@ -165,9 +162,43 @@ export async function onMessageReactionAdd(
       await reaction.message.fetch();
     } catch (err) {
       console.error("[개추해] 메시지 fetch 실패:", err);
-      return;
+      return false;
     }
   }
+  return true;
+}
+
+async function handleDuplicateCheck(
+  gaechuChannel: TextChannel,
+  predicate: (embed: {
+    url: string | null;
+    fields: { name: string; value: string }[];
+  }) => boolean,
+  message: MessageReaction["message"],
+  maxCount: number,
+): Promise<boolean> {
+  const existing = await findInGaechuChannel(gaechuChannel, predicate);
+  if (!existing) return false;
+
+  if (maxCount > existing.currentMax) {
+    console.log(
+      `[개추해] 중복 발견, 리액션 업데이트: ${existing.currentMax} → ${maxCount}`,
+    );
+    const existingMsg = await gaechuChannel.messages.fetch(existing.messageId);
+    const embed = buildGaechuEmbed(message, maxCount);
+    await existingMsg.edit({ embeds: [embed] });
+  } else {
+    console.log("[개추해] 중복이며 기존 리액션이 더 높음, 스킵");
+  }
+  return true;
+}
+
+export async function onMessageReactionAdd(
+  reaction: MessageReaction | PartialMessageReaction,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _user: User | PartialUser,
+): Promise<void> {
+  if (!(await ensureFullReaction(reaction))) return;
 
   const message = reaction.message;
 
@@ -200,53 +231,24 @@ export async function onMessageReactionAdd(
       return;
     }
 
-    // URL 기반 중복 체크
     const content = message.content ?? "";
     const urlMatch = content.match(URL_REGEX);
     const url = urlMatch?.[0];
 
-    if (url) {
-      const existing = await findInGaechuChannel(
-        gaechuChannel,
-        (embed) => embed.url === url,
-      );
-      if (existing) {
-        if (maxCount > existing.currentMax) {
-          console.log(
-            `[개추해] 중복 URL 발견, 리액션 업데이트: ${existing.currentMax} → ${maxCount}`,
-          );
-          const existingMsg = await gaechuChannel.messages.fetch(
-            existing.messageId,
-          );
-          const embed = buildGaechuEmbed(message, maxCount);
-          await existingMsg.edit({ embeds: [embed] });
-        } else {
-          console.log("[개추해] 중복 URL이며 기존 리액션이 더 높음, 스킵");
-        }
-        return;
-      }
-    } else {
-      // URL이 없는 메시지: 원본 메시지 URL로 중복 체크
-      const existing = await findInGaechuChannel(gaechuChannel, (embed) => {
-        const linkField = embed.fields.find((f) => f.name === "원본 메시지");
-        return linkField ? linkField.value.includes(message.url) : false;
-      });
-      if (existing) {
-        if (maxCount > existing.currentMax) {
-          console.log(
-            `[개추해] 중복 메시지 발견, 리액션 업데이트: ${existing.currentMax} → ${maxCount}`,
-          );
-          const existingMsg = await gaechuChannel.messages.fetch(
-            existing.messageId,
-          );
-          const embed = buildGaechuEmbed(message, maxCount);
-          await existingMsg.edit({ embeds: [embed] });
-        } else {
-          console.log("[개추해] 중복 메시지이며 기존 리액션이 더 높음, 스킵");
-        }
-        return;
-      }
-    }
+    const predicate = url
+      ? (embed: { url: string | null }) => embed.url === url
+      : (embed: { fields: { name: string; value: string }[] }) => {
+          const linkField = embed.fields.find((f) => f.name === "원본 메시지");
+          return linkField ? linkField.value.includes(message.url) : false;
+        };
+
+    const isDuplicate = await handleDuplicateCheck(
+      gaechuChannel,
+      predicate,
+      message,
+      maxCount,
+    );
+    if (isDuplicate) return;
 
     // 새 개추 메시지 전송
     const embed = buildGaechuEmbed(message, maxCount);
