@@ -17,9 +17,11 @@ import { SEVEN_DAYS_MS } from "../constants/time";
 /**
  * 동시 리액션에 의한 중복 전송 방지.
  * 같은 메시지에 대한 두 번째 이벤트는 첫 번째 처리 완료까지 무시된다.
- * 첫 번째 이벤트 시점에 reactions.cache가 이미 최신이므로 정확한 count를 사용한다.
  */
 const processing = new Set<string>();
+
+/** 이미 개추 완료된 메시지 ID 캐시. 개추해 채널 스캔 없이 즉시 중복 판별. */
+const gaechuSent = new Set<string>();
 
 function getMaxReactionCount(
   reaction: MessageReaction | PartialMessageReaction,
@@ -247,11 +249,22 @@ export async function onMessageReactionAdd(
       return;
     }
 
-    if (await isDuplicateInGaechu(gaechuChannel, message.id)) return;
+    // 인메모리 캐시로 즉시 중복 판별
+    if (gaechuSent.has(message.id)) {
+      console.log(`[개추해] 이미 개추된 메시지 (캐시), 스킵: ${message.id}`);
+      return;
+    }
+
+    // 캐시에 없으면 개추해 채널 스캔으로 확인 (봇 재시작 후 대응)
+    if (await isDuplicateInGaechu(gaechuChannel, message.id)) {
+      gaechuSent.add(message.id);
+      return;
+    }
 
     // 새 개추 메시지 전송
     const payload = await buildGaechuPayload(message);
     await gaechuChannel.send(payload);
+    gaechuSent.add(message.id);
     console.log(`[개추해] 개추 완료: ${message.url}`);
   } finally {
     processing.delete(message.id);
