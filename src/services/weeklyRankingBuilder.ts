@@ -1,53 +1,45 @@
 import { EmbedBuilder, Message, TextChannel } from "discord.js";
 import { EMBED_COLOR } from "../constants/discord";
 import { SEVEN_DAYS_MS } from "../constants/time";
+import { fetchMessagesSince } from "../utils/pagination";
 import { URL_REGEX } from "../utils/url";
 
 const TOP_N = 3;
 const PREVIEW_MAX_LENGTH = 60;
 
-async function fetchMessagesForLastWeek(
-  channel: TextChannel,
-): Promise<Message[]> {
-  const sevenDaysAgo = Date.now() - SEVEN_DAYS_MS;
-  const allMessages: Message[] = [];
-  let lastId: string | undefined;
+type CountEntry = { count: number; displayName: string };
 
-  while (true) {
-    const options: { limit: number; before?: string } = { limit: 100 };
-    if (lastId) options.before = lastId;
-
-    const batch = await channel.messages.fetch(options);
-    if (batch.size === 0) break;
-
-    const recent = batch.filter((m) => m.createdTimestamp >= sevenDaysAgo);
-    allMessages.push(...recent.values());
-
-    const oldest = batch.last();
-    if (!oldest || oldest.createdTimestamp < sevenDaysAgo) break;
-
-    lastId = oldest.id;
-  }
-
-  return allMessages;
+interface RankingData {
+  reactionTop: { message: Message; totalReactions: number }[];
+  threadTop: { message: Message; commentCount: number }[];
+  messageCounts: Map<string, CountEntry>;
+  urlCounts: Map<string, CountEntry>;
+  reactionGivenCounts: Map<string, CountEntry>;
+  reactionReceivedCounts: Map<string, CountEntry>;
 }
 
-/**
- * 여러 채널의 7일간 메시지를 합산하여 주간 랭킹 임베드를 생성한다.
- * 단일 채널도 배열로 감싸서 전달 가능.
- */
-export async function buildWeeklyRankingEmbed(
-  channels: TextChannel[],
-): Promise<EmbedBuilder | null> {
-  const allMessages: Message[] = [];
-  for (const channel of channels) {
-    const msgs = await fetchMessagesForLastWeek(channel);
-    allMessages.push(...msgs);
-  }
+const addCount = (
+  map: Map<string, CountEntry>,
+  author: { id: string; displayName: string },
+  amount = 1,
+) => {
+  const existing = map.get(author.id);
+  if (existing) existing.count += amount;
+  else map.set(author.id, { count: amount, displayName: author.displayName });
+};
 
-  if (allMessages.length === 0) return null;
+const formatTop3 = (map: Map<string, CountEntry>) =>
+  [...map.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, TOP_N)
+    .map(
+      ([, { count, displayName }], i) =>
+        `${i + 1}. ${displayName} (${count}개)`,
+    )
+    .join(" | ");
 
-  const reactionTop3 = allMessages
+async function computeRankingData(messages: Message[]): Promise<RankingData> {
+  const reactionTop = messages
     .filter((m) => URL_REGEX.test(m.content))
     .map((m) => ({
       message: m,
@@ -60,7 +52,7 @@ export async function buildWeeklyRankingEmbed(
     .sort((a, b) => b.totalReactions - a.totalReactions)
     .slice(0, TOP_N);
 
-  const threadTop3 = allMessages
+  const threadTop = messages
     .filter((m) => m.thread && (m.thread.messageCount ?? 0) > 0)
     .map((m) => ({
       message: m,
@@ -69,90 +61,11 @@ export async function buildWeeklyRankingEmbed(
     .sort((a, b) => b.commentCount - a.commentCount)
     .slice(0, TOP_N);
 
-  const medals = ["🥇", "🥈", "🥉"];
-
-  const embed = new EmbedBuilder()
-    .setColor(EMBED_COLOR)
-    .setTitle("주간 랭킹 (지난 7일)")
-    .setTimestamp();
-
-  const REACTION_NAME = "가장 좋아요👍가 많았던 메시지 TOP 3";
-  if (reactionTop3.length === 0) {
-    embed.addFields({
-      name: REACTION_NAME,
-      value: "해당 메시지가 없습니다.",
-    });
-  } else {
-    const lines = reactionTop3.map((item, i) => {
-      const url = item.message.content.match(URL_REGEX)?.[0] ?? "";
-      const preview =
-        url.length > PREVIEW_MAX_LENGTH
-          ? url.slice(0, PREVIEW_MAX_LENGTH) + "..."
-          : url;
-      const author =
-        item.message.author.displayName ?? item.message.author.username;
-      const threadName = item.message.thread?.name ?? "";
-      const threadInfo = threadName ? ` | 스레드: ${threadName}` : "";
-      return `${medals[i]} **${item.totalReactions}개 반응** | [메시지 바로가기](${item.message.url})\n> ${preview}\n> 작성자: ${author}${threadInfo}`;
-    });
-    embed.addFields({ name: REACTION_NAME, value: lines.join("\n\n") });
-  }
-
-  const COMMENT_NAME = "가장 활발히 대화🗣️했던 메시지 TOP 3";
-  if (threadTop3.length === 0) {
-    embed.addFields({
-      name: COMMENT_NAME,
-      value: "해당 메시지가 없습니다.",
-    });
-  } else {
-    const lines = threadTop3.map((item, i) => {
-      const preview =
-        item.message.content.length > PREVIEW_MAX_LENGTH
-          ? item.message.content.slice(0, PREVIEW_MAX_LENGTH) + "..."
-          : item.message.content || "(내용 없음)";
-      const author =
-        item.message.author.displayName ?? item.message.author.username;
-      const threadName = item.message.thread?.name ?? "";
-      const threadInfo = threadName ? ` | 스레드: ${threadName}` : "";
-      return `${medals[i]} **${item.commentCount}개 댓글** | [메시지 바로가기](${item.message.url})\n> ${preview}\n> 작성자: ${author}${threadInfo}`;
-    });
-    embed.addFields({ name: COMMENT_NAME, value: lines.join("\n\n") });
-  }
-
-  type CountEntry = { count: number; displayName: string };
-
-  const addCount = (
-    map: Map<string, CountEntry>,
-    author: { id: string; displayName: string },
-    amount = 1,
-  ) => {
-    const existing = map.get(author.id);
-    if (existing) existing.count += amount;
-    else map.set(author.id, { count: amount, displayName: author.displayName });
-  };
-
-  const formatTop3 = (map: Map<string, CountEntry>) =>
-    [...map.entries()]
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, TOP_N)
-      .map(
-        ([, { count, displayName }], i) =>
-          `${i + 1}. ${displayName} (${count}개)`,
-      )
-      .join(" | ");
-
-  const addRankingField = (name: string, map: Map<string, CountEntry>) => {
-    embed.addFields({
-      name,
-      value: map.size === 0 ? "해당 멤버가 없습니다." : formatTop3(map),
-    });
-  };
-
   const messageCounts = new Map<string, CountEntry>();
   const urlCounts = new Map<string, CountEntry>();
   const reactionReceivedCounts = new Map<string, CountEntry>();
 
-  for (const m of allMessages) {
+  for (const m of messages) {
     if (m.author.bot) continue;
     const author = {
       id: m.author.id,
@@ -169,7 +82,7 @@ export async function buildWeeklyRankingEmbed(
   }
 
   const reactionGivenCounts = new Map<string, CountEntry>();
-  const messagesWithReactions = allMessages.filter(
+  const messagesWithReactions = messages.filter(
     (m) => m.reactions.cache.size > 0,
   );
   await Promise.all(
@@ -190,13 +103,104 @@ export async function buildWeeklyRankingEmbed(
     }),
   );
 
-  addRankingField("💬 가장 많이 대화한 사람 TOP 3", messageCounts);
-  addRankingField("🔗 가장 많이 아티클을 공유한 사람 TOP 3", urlCounts);
-  addRankingField("🎶 리액션이 가장 많았던 사람 TOP 3", reactionGivenCounts);
+  return {
+    reactionTop,
+    threadTop,
+    messageCounts,
+    urlCounts,
+    reactionGivenCounts,
+    reactionReceivedCounts,
+  };
+}
+
+function assembleRankingEmbed(data: RankingData): EmbedBuilder {
+  const medals = ["🥇", "🥈", "🥉"];
+
+  const embed = new EmbedBuilder()
+    .setColor(EMBED_COLOR)
+    .setTitle("주간 랭킹 (지난 7일)")
+    .setTimestamp();
+
+  const REACTION_NAME = "가장 좋아요👍가 많았던 메시지 TOP 3";
+  if (data.reactionTop.length === 0) {
+    embed.addFields({
+      name: REACTION_NAME,
+      value: "해당 메시지가 없습니다.",
+    });
+  } else {
+    const lines = data.reactionTop.map((item, i) => {
+      const url = item.message.content.match(URL_REGEX)?.[0] ?? "";
+      const preview =
+        url.length > PREVIEW_MAX_LENGTH
+          ? url.slice(0, PREVIEW_MAX_LENGTH) + "..."
+          : url;
+      const author =
+        item.message.author.displayName ?? item.message.author.username;
+      const threadName = item.message.thread?.name ?? "";
+      const threadInfo = threadName ? ` | 스레드: ${threadName}` : "";
+      return `${medals[i]} **${item.totalReactions}개 반응** | [메시지 바로가기](${item.message.url})\n> ${preview}\n> 작성자: ${author}${threadInfo}`;
+    });
+    embed.addFields({ name: REACTION_NAME, value: lines.join("\n\n") });
+  }
+
+  const COMMENT_NAME = "가장 활발히 대화🗣️했던 메시지 TOP 3";
+  if (data.threadTop.length === 0) {
+    embed.addFields({
+      name: COMMENT_NAME,
+      value: "해당 메시지가 없습니다.",
+    });
+  } else {
+    const lines = data.threadTop.map((item, i) => {
+      const preview =
+        item.message.content.length > PREVIEW_MAX_LENGTH
+          ? item.message.content.slice(0, PREVIEW_MAX_LENGTH) + "..."
+          : item.message.content || "(내용 없음)";
+      const author =
+        item.message.author.displayName ?? item.message.author.username;
+      const threadName = item.message.thread?.name ?? "";
+      const threadInfo = threadName ? ` | 스레드: ${threadName}` : "";
+      return `${medals[i]} **${item.commentCount}개 댓글** | [메시지 바로가기](${item.message.url})\n> ${preview}\n> 작성자: ${author}${threadInfo}`;
+    });
+    embed.addFields({ name: COMMENT_NAME, value: lines.join("\n\n") });
+  }
+
+  const addRankingField = (name: string, map: Map<string, CountEntry>) => {
+    embed.addFields({
+      name,
+      value: map.size === 0 ? "해당 멤버가 없습니다." : formatTop3(map),
+    });
+  };
+
+  addRankingField("💬 가장 많이 대화한 사람 TOP 3", data.messageCounts);
+  addRankingField("🔗 가장 많이 아티클을 공유한 사람 TOP 3", data.urlCounts);
+  addRankingField(
+    "🎶 리액션이 가장 많았던 사람 TOP 3",
+    data.reactionGivenCounts,
+  );
   addRankingField(
     "😎 리액션을 가장 많이 받은 사람 TOP 3",
-    reactionReceivedCounts,
+    data.reactionReceivedCounts,
   );
 
   return embed;
+}
+
+/**
+ * 여러 채널의 7일간 메시지를 합산하여 주간 랭킹 임베드를 생성한다.
+ * 단일 채널도 배열로 감싸서 전달 가능.
+ */
+export async function buildWeeklyRankingEmbed(
+  channels: TextChannel[],
+): Promise<EmbedBuilder | null> {
+  const cutoff = Date.now() - SEVEN_DAYS_MS;
+  const allMessages: Message[] = [];
+  for (const channel of channels) {
+    const msgs = await fetchMessagesSince(channel, cutoff);
+    allMessages.push(...msgs);
+  }
+
+  if (allMessages.length === 0) return null;
+
+  const data = await computeRankingData(allMessages);
+  return assembleRankingEmbed(data);
 }
