@@ -12,16 +12,13 @@ import {
   reactionThreshold,
 } from "../../config.json";
 import { EMBED_COLOR } from "../constants/discord";
-import { SEVEN_DAYS_MS } from "../constants/time";
+import { isGaechuSent, markGaechuSent } from "../lib/db";
 
 /**
  * 동시 리액션에 의한 중복 전송 방지.
  * 같은 메시지에 대한 두 번째 이벤트는 첫 번째 처리 완료까지 무시된다.
  */
 const processing = new Set<string>();
-
-/** 이미 개추 완료된 메시지 ID 캐시. 개추해 채널 스캔 없이 즉시 중복 판별. */
-const gaechuSent = new Set<string>();
 
 function getMaxReactionCount(
   reaction: MessageReaction | PartialMessageReaction,
@@ -131,47 +128,6 @@ async function buildGaechuPayload(
   return { embeds: allEmbeds, files };
 }
 
-/**
- * 개추해 채널에서 7일 이내 봇 메시지 중 predicate에 매칭되는 것을 찾는다.
- */
-async function findInGaechuChannel(
-  gaechuChannel: TextChannel,
-  predicate: (embed: {
-    url: string | null;
-    fields: { name: string; value: string }[];
-    footer: { text: string } | null;
-  }) => boolean,
-): Promise<{ messageId: string } | null> {
-  const sevenDaysAgo = Date.now() - SEVEN_DAYS_MS;
-  let lastId: string | undefined;
-
-  while (true) {
-    const options: { limit: number; before?: string } = { limit: 100 };
-    if (lastId) options.before = lastId;
-
-    const batch = await gaechuChannel.messages.fetch(options);
-    if (batch.size === 0) break;
-
-    for (const msg of batch.values()) {
-      if (msg.createdTimestamp < sevenDaysAgo) return null;
-      if (msg.author.id !== msg.client.user?.id) continue;
-
-      const embed = msg.embeds[0];
-      if (!embed) continue;
-
-      if (predicate(embed)) {
-        return { messageId: msg.id };
-      }
-    }
-
-    const oldest = batch.last();
-    if (!oldest || oldest.createdTimestamp < sevenDaysAgo) break;
-    lastId = oldest.id;
-  }
-
-  return null;
-}
-
 async function ensureFullReaction(
   reaction: MessageReaction | PartialMessageReaction,
 ): Promise<boolean> {
@@ -192,23 +148,6 @@ async function ensureFullReaction(
     }
   }
   return true;
-}
-
-async function isDuplicateInGaechu(
-  gaechuChannel: TextChannel,
-  messageId: string,
-): Promise<boolean> {
-  const predicate = (embed: {
-    url: string | null;
-    fields: { name: string; value: string }[];
-    footer: { text: string } | null;
-  }) => embed.footer?.text === `원본: ${messageId}`;
-
-  const existing = await findInGaechuChannel(gaechuChannel, predicate);
-  if (existing) {
-    console.log(`[개추해] 이미 개추된 메시지, 스킵 (원본: ${messageId})`);
-  }
-  return !!existing;
 }
 
 export async function onMessageReactionAdd(
@@ -249,22 +188,16 @@ export async function onMessageReactionAdd(
       return;
     }
 
-    // 인메모리 캐시로 즉시 중복 판별
-    if (gaechuSent.has(message.id)) {
-      console.log(`[개추해] 이미 개추된 메시지 (캐시), 스킵: ${message.id}`);
-      return;
-    }
-
-    // 캐시에 없으면 개추해 채널 스캔으로 확인 (봇 재시작 후 대응)
-    if (await isDuplicateInGaechu(gaechuChannel, message.id)) {
-      gaechuSent.add(message.id);
+    // DB로 중복 판별 (봇 재시작에도 유지)
+    if (isGaechuSent(message.id)) {
+      console.log(`[개추해] 이미 개추된 메시지, 스킵: ${message.id}`);
       return;
     }
 
     // 새 개추 메시지 전송
     const payload = await buildGaechuPayload(message);
     await gaechuChannel.send(payload);
-    gaechuSent.add(message.id);
+    markGaechuSent(message.id);
     console.log(`[개추해] 개추 완료: ${message.url}`);
   } finally {
     processing.delete(message.id);
