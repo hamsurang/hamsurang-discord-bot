@@ -3,3 +3,5 @@ node_modules
 dist
 *.log
 LightsailDefaultKey-ap-northeast-2.pem
+docs/
+data/

@@ -24,13 +24,18 @@
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.30.3",
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3"]
+  },
   "dependencies": {
     "@discordjs/opus": "^0.10.0",
     "@discordjs/voice": "^0.19.0",
     "@google/genai": "^1.0.0",
     "@snazzah/davey": "^0.1.10",
+    "better-sqlite3": "^12.8.0",
     "discord.js": "^14.25.1",
     "ffmpeg-static": "^5.3.0",
+    "node-cron": "^4.2.1",
     "node-html-parser": "^7.1.0",
     "openai": "^6.27.0",
     "sodium-native": "^5.1.0",
@@ -38,7 +43,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.15",
+    "@types/node-cron": "^3.0.11",
     "eslint": "^10.0.2",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
