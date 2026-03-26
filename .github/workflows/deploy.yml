@@ -71,7 +71,8 @@ jobs:
               "DISCORD_GUILD_ID=${{ secrets.DISCORD_GUILD_ID }}" \
               "GEMINI_API_KEYS=${{ secrets.GEMINI_API_KEYS }}" \
               "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" \
-              "ALLOWED_CHANNEL_IDS=${{ secrets.ALLOWED_CHANNEL_IDS }}" \
+              "TRACKING_CHANNEL_IDS=${{ secrets.TRACKING_CHANNEL_IDS }}" \
+              "SUMMARY_CHANNEL_IDS=${{ secrets.SUMMARY_CHANNEL_IDS }}" \
               "GAECHU_CHANNEL_ID=${{ secrets.GAECHU_CHANNEL_ID }}" \
               "REACTION_THRESHOLD=${{ secrets.REACTION_THRESHOLD }}" \
               > .env

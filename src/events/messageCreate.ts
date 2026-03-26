@@ -1,5 +1,5 @@
 import { EmbedBuilder, Message, ThreadAutoArchiveDuration } from "discord.js";
-import { allowedChannelIds } from "../config";
+import { summaryChannelIds } from "../config";
 import { THREAD_NAME_MAX_LENGTH, EMBED_COLOR } from "../constants/discord";
 import { URL_REGEX, extractYouTubeVideoId } from "../utils/url";
 import {
@@ -45,7 +45,7 @@ function buildSummaryEmbed(summary: string, url: string): EmbedBuilder {
 
 export async function onMessageCreate(message: Message): Promise<void> {
   if (message.author.bot) return;
-  if (!allowedChannelIds.includes(message.channelId)) return;
+  if (!summaryChannelIds.includes(message.channelId)) return;
   if (!message.channel.isTextBased() || !("threads" in message.channel)) return;
 
   const match = message.content.match(URL_REGEX);
