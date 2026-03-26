@@ -7,7 +7,7 @@ import {
   User,
 } from "discord.js";
 import {
-  allowedChannelIds,
+  trackingChannelIds,
   gaechuChannelId,
   reactionThreshold,
 } from "../config";
@@ -151,7 +151,7 @@ export async function onMessageReactionAdd(
   // 스레드 내 댓글은 개추 대상이 아님 (스레드를 시작한 원본 메시지만 대상)
   if (message.channel.isThread()) return;
 
-  if (!allowedChannelIds.includes(message.channelId)) return;
+  if (!trackingChannelIds.includes(message.channelId)) return;
 
   // 최대 리액션 수 확인 (단일 이모지 중 최대값)
   const maxCount = getMaxReactionCount(reaction);

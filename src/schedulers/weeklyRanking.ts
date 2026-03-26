@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { Client, TextChannel } from "discord.js";
-import { allowedChannelIds, gaechuChannelId } from "../config";
+import { trackingChannelIds, gaechuChannelId } from "../config";
 import { buildWeeklyRankingEmbed } from "../services/weeklyRankingBuilder";
 
 export function startWeeklyRankingScheduler(client: Client): void {
@@ -18,7 +18,7 @@ export function startWeeklyRankingScheduler(client: Client): void {
       try {
         // 소스 채널들에서 메시지 수집 (개별 채널 실패 시 나머지 계속 진행)
         const sourceChannels: TextChannel[] = [];
-        for (const channelId of allowedChannelIds) {
+        for (const channelId of trackingChannelIds) {
           try {
             const ch = await client.channels.fetch(channelId);
             if (ch instanceof TextChannel) {
