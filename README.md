@@ -51,7 +51,10 @@ pnpm install --force
 
 ## 설정
 
-프로젝트 루트에 `.env` 파일을 생성하세요 (`.gitignore`에 포함되어 있어 직접 만들어야 합니다):
+프로젝트 루트에 환경 변수 파일을 생성하세요 (`.gitignore`에 포함되어 있어 직접 만들어야 합니다):
+
+- **프로덕션**: `.env` 파일 생성
+- **개발 환경**: `.local.env` 파일 생성
 
 ```env
 DISCORD_TOKEN=디스코드 봇 토큰
@@ -68,7 +71,7 @@ REACTION_THRESHOLD=5
 ### 디스코드 봇 설정 (Developer Portal)
 
 1. [Discord Developer Portal](https://discord.com/developers/applications)에서 앱 생성
-2. **Bot** 탭에서 토큰 복사 -> `config.json`의 `token`에 입력
+2. **Bot** 탭에서 토큰 복사 -> `.env` (`.local.env`)의 `DISCORD_TOKEN`에 입력
 3. **Privileged Gateway Intents** 에서 다음을 활성화:
    - Message Content Intent
    - Server Members Intent (선택)
