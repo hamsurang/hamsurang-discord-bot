@@ -1,4 +1,4 @@
-import { callGemini } from "../lib/ai";
+import { callLLM } from "../lib/ai";
 
 export async function summarizeTranscript(texts: string[]): Promise<string> {
   console.log(
@@ -13,11 +13,11 @@ export async function summarizeTranscript(texts: string[]): Promise<string> {
     return "음성 내용이 감지되지 않았습니다.";
   }
 
-  console.log(`[요약] Gemini API 호출 시작 (텍스트 길이: ${fullText.length})`);
-  const summary = await callGemini(
+  console.log(`[요약] LLM API 호출 시작 (텍스트 길이: ${fullText.length})`);
+  const summary = await callLLM(
     `아래는 디스코드 음성채널 회의의 음성 인식 텍스트입니다. 주요 논의 내용을 한국어로 요약해주세요.\n\n형식:\n## 회의 요약\n- 핵심 내용 1\n- 핵심 내용 2\n- ...\n\n## 주요 키워드\n키워드1, 키워드2, 키워드3\n\n---\n\n${fullText}`,
   );
 
-  console.log(`[요약] Gemini 응답 완료 (길이: ${summary.length})`);
+  console.log(`[요약] LLM 응답 완료 (길이: ${summary.length})`);
   return summary;
 }

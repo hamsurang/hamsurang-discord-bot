@@ -8,6 +8,7 @@ import {
   PageFetchResult,
 } from "../services/pageFetcher";
 import { summarizeContent, summarizeYouTube } from "../services/summarizer";
+import { QuotaExhaustedError } from "../lib/ai";
 
 async function resolveThreadName(
   url: string,
@@ -123,6 +124,12 @@ export async function onMessageCreate(message: Message): Promise<void> {
     console.log(`[링크요약] 임베드 게시 완료: ${rawUrl}`);
   } catch (error) {
     console.error("[링크요약] 요약 실패:", error);
-    await placeholder.edit("링크 내용을 읽어오는 데 실패했습니다.");
+    if (error instanceof QuotaExhaustedError) {
+      await placeholder.edit(
+        "API 크레딧을 전부 소진했습니다! 관리자에게 문의해주세요.",
+      );
+    } else {
+      await placeholder.edit("링크 내용을 읽어오는 데 실패했습니다.");
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { YoutubeTranscript } from "youtube-transcript";
-import { callGemini } from "../lib/ai";
+import { callLLM } from "../lib/ai";
 import { isCommunityUrl } from "../utils/url";
 import { MAX_CONTENT_LENGTH } from "../constants/fetcher";
 import {
@@ -13,7 +13,7 @@ export async function summarizeContent(
   url: string,
 ): Promise<string> {
   const prompt = isCommunityUrl(url) ? COMMUNITY_PROMPT : DEFAULT_PROMPT;
-  return callGemini(`${prompt}\n\n${content}`);
+  return callLLM(`${prompt}\n\n${content}`);
 }
 
 export async function summarizeYouTube(videoId: string): Promise<string> {
@@ -28,5 +28,5 @@ export async function summarizeYouTube(videoId: string): Promise<string> {
     return "자막을 찾을 수 없습니다. 자막이 비활성화되었거나 지원되지 않는 영상입니다.";
   }
 
-  return callGemini(`${YOUTUBE_PROMPT}\n\n${transcript}`);
+  return callLLM(`${YOUTUBE_PROMPT}\n\n${transcript}`);
 }
