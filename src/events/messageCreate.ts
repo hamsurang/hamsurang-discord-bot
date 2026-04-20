@@ -1,4 +1,12 @@
-import { EmbedBuilder, Message, ThreadAutoArchiveDuration } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonInteraction,
+  ButtonStyle,
+  EmbedBuilder,
+  Message,
+  ThreadAutoArchiveDuration,
+} from "discord.js";
 import { summaryChannelIds } from "../config";
 import { THREAD_NAME_MAX_LENGTH, EMBED_COLOR } from "../constants/discord";
 import { URL_REGEX, extractYouTubeVideoId } from "../utils/url";
@@ -9,6 +17,8 @@ import {
 } from "../services/pageFetcher";
 import { summarizeContent, summarizeYouTube } from "../services/summarizer";
 import { QuotaExhaustedError } from "../lib/ai";
+
+export const RETRY_SUMMARY_CUSTOM_ID = "retry_summary";
 
 async function resolveThreadName(
   url: string,
@@ -129,7 +139,86 @@ export async function onMessageCreate(message: Message): Promise<void> {
         "API 크레딧을 전부 소진했습니다! 관리자에게 문의해주세요.",
       );
     } else {
-      await placeholder.edit("링크 내용을 읽어오는 데 실패했습니다.");
+      const retryButton = new ButtonBuilder()
+        .setCustomId("retry_summary")
+        .setLabel("재시도")
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji("🔄");
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        retryButton,
+      );
+      await placeholder.edit({
+        content: "링크 내용을 읽어오는 데 실패했습니다.",
+        components: [row],
+      });
+    }
+  }
+}
+
+export async function onRetrySummary(
+  interaction: ButtonInteraction,
+): Promise<void> {
+  const thread = interaction.channel;
+  if (!thread?.isThread()) return;
+
+  const starterMessage = await thread.fetchStarterMessage();
+  if (!starterMessage) {
+    await interaction.reply({
+      content: "원본 메시지를 찾을 수 없습니다.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const match = starterMessage.content.match(URL_REGEX);
+  if (!match) {
+    await interaction.reply({
+      content: "URL을 찾을 수 없습니다.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const rawUrl = match[0];
+  const videoId = extractYouTubeVideoId(rawUrl);
+
+  await interaction.update({ content: "요약중입니다...💭", components: [] });
+
+  try {
+    let summary: string;
+    if (videoId) {
+      summary = await summarizeYouTube(videoId);
+    } else {
+      const pageResult = await fetchPageContent(rawUrl);
+      summary = await summarizeContent(pageResult.content, rawUrl);
+    }
+
+    const embed = buildSummaryEmbed(summary, rawUrl);
+    await interaction.editReply({
+      content: "",
+      embeds: [embed],
+      components: [],
+    });
+  } catch (error) {
+    console.error("[링크요약] 재시도 실패:", error);
+    if (error instanceof QuotaExhaustedError) {
+      await interaction.editReply({
+        content: "API 크레딧을 전부 소진했습니다! 관리자에게 문의해주세요.",
+        components: [],
+      });
+    } else {
+      const retryButton = new ButtonBuilder()
+        .setCustomId("retry_summary")
+        .setLabel("재시도")
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji("🔄");
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        retryButton,
+      );
+      await interaction.editReply({
+        content: "링크 내용을 읽어오는 데 실패했습니다.",
+        components: [row],
+      });
     }
   }
 }

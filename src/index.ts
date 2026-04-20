@@ -10,7 +10,11 @@ import {
 } from "discord.js";
 import { token } from "./config";
 import { Command } from "./types";
-import { onMessageCreate } from "./events/messageCreate";
+import {
+  onMessageCreate,
+  onRetrySummary,
+  RETRY_SUMMARY_CUSTOM_ID,
+} from "./events/messageCreate";
 import { onMessageReactionAdd } from "./events/messageReactionAdd";
 import { startWeeklyRankingScheduler } from "./schedulers/weeklyRanking";
 
@@ -66,6 +70,14 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  if (
+    interaction.isButton() &&
+    interaction.customId === RETRY_SUMMARY_CUSTOM_ID
+  ) {
+    await onRetrySummary(interaction);
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   console.log(
